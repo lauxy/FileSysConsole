@@ -71,27 +71,6 @@ namespace FileSysConsole
             return;
         }
 
-        /// <summary>
-        /// 从磁盘用户区加载所有用户信息到内存
-        /// </summary>
-        /// <returns></returns>
-        public List<User> LoadUsersInfofromDisk()
-        {
-            List<User> userslist = new List<User>();
-
-            //Todo: 从磁盘用户区加载所有用户信息到内存.
-            return userslist;
-        }
-
-        /// <summary>
-        /// 将用户信息写回到磁盘
-        /// </summary>
-        public bool StoreUserInfotoDisk(uint uid, uint curfolder)
-        {
-            //Todo: 将MemoryUser写回到磁盘
-            return true;
-        }
-
         const uint MAX_USERNUM = 10; //内存中允许的最大用户数（同时在线）
         uint cur_usernum = 0;        //当前内存中驻留的用户数量
 
@@ -103,7 +82,7 @@ namespace FileSysConsole
         /// <returns>登录是否成功</returns>
         public bool LoginSys(uint uid, string password)
         {
-            List<User> users = LoadUsersInfofromDisk();
+            List<User> users = startup.LoadUsersInfofromDisk();
             bool isExist = false;
             User curUser = new User();
             foreach(User user in users)
@@ -153,19 +132,18 @@ namespace FileSysConsole
         /// <returns>退出成功与否</returns>
         public bool LogoutSys()
         {
-            bool issucceed = StoreUserInfotoDisk(user.uid, user.current_folder);
+            bool issucceed = startup.StoreUserInfotoDisk(user.uid, user.current_folder);
             user.Destructor(); //释放资源
             Console.WriteLine("You have been logout successfully!");
             return issucceed;
         }
 
-
         /// <summary>
-        /// 全盘搜索一个文件，返回所有同名文件的i节点。
+        /// 全盘搜索一个文件
         /// </summary>
         /// <param name="filename"></param>
-        /// <returns></returns>
-        public List<DiskiNode> SearchFile(string filename)
+        /// <returns>返回所有同名文件的i节点</returns>
+        public List<DiskiNode> SearchInAllDisk(string filename)
         {
             List<DiskiNode> reslist = new List<DiskiNode>();
             if (!isCreateIndex)
@@ -213,6 +191,16 @@ namespace FileSysConsole
                 Console.WriteLine("No file or folder named " + filename + " was found!");
             }
             return reslist;
+        }
+
+        /// <summary>
+        /// 在当前目录下搜索
+        /// </summary>
+        /// <param name="filename">要搜索的文件名</param>
+        /// <returns>返回当前目录下所有符合的文件i结点</returns>
+        public List<DiskiNode> SearchInCurrentFolder(string filename)
+        {
+
         }
     }
 
