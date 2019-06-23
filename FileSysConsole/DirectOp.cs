@@ -13,8 +13,6 @@ namespace FileSysConsole
     {
         const uint BLOCK_SIZE = 1024;
 
-        const uint iNODE_SUM_NUM = 1024 * 50;      //i节点的总数量
-
         MemoryUser user = new MemoryUser(1,0);
 
         Execute startup = new Execute();
@@ -141,7 +139,30 @@ namespace FileSysConsole
         }
 
         /// <summary>
-        /// 全盘搜索一个文件
+        /// 判断字符串是否匹配（为解决模糊查找而设计）
+        /// </summary>
+        /// <param name="src">原字符串</param>
+        /// <param name="tar">待查字符串</param>
+        /// <returns>两字符串是否匹配（或相等）</returns>
+        public bool MatchString(string src, string tar)
+        {
+            if (tar.Contains("*"))
+            {
+                string[] filter = tar.Split("*");
+                for(int i = 0; i < filter.Count(); i++)
+                {
+                    if (!src.Contains(filter[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return src == tar;
+        }
+
+        /// <summary>
+        /// 全盘搜索一个文件（支持模糊查找）
         /// </summary>
         /// <param name="filename"></param>
         /// <returns>返回所有同名文件的i节点</returns>
@@ -161,7 +182,7 @@ namespace FileSysConsole
                 {
                     DiskiNode visit = stack.Peek();
                     stack.Pop();
-                    if(visit.name == filename)
+                    if(MatchString(visit.name, filename))
                     {
                         //找到一个与filename名字相同的文件(夹)
                         reslist.Add(visit);
@@ -195,7 +216,7 @@ namespace FileSysConsole
         }
 
         /// <summary>
-        /// 在当前目录下搜索
+        /// 在当前目录下搜索（支持模糊查找）
         /// </summary>
         /// <param name="path">指定从那个目录开始搜索</param>
         /// <param name="filename">要搜索的文件名</param>
@@ -233,7 +254,7 @@ namespace FileSysConsole
             {
                 DiskiNode visit = stack.Peek();
                 stack.Pop();
-                if (visit.name == filename)
+                if (MatchString(visit.name, filename))
                 {
                     reslist.Add(visit);
                 }
