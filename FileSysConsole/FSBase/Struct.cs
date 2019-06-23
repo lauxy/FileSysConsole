@@ -145,6 +145,16 @@ namespace FileSysTemp.FSBase
             this.current_folder = cf;
             this.open_file.Add(cf);
         }
+        /// <summary>
+        /// 可供显式调用的析构函数
+        /// </summary>
+        /// 
+        public void Destructor()
+        {
+            open_file.Clear();
+            uid = 0;
+            current_folder = 0;
+        }
     }
 
     /// <summary>
