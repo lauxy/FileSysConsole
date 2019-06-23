@@ -97,14 +97,14 @@ namespace FileSysConsole
         public DiskiNode GetiNode(uint id)
         {
             uint temp_id = id % 128;
-            DiskiNode dn;
             DiskiNode dn2 = new DiskiNode();
-            for (int i = 0; i < sys_inode_tt.tt[temp_id].di_table.Count(); i++)
+            iNodeTable it = sys_inode_tt.tt[temp_id];
+            for (int i = 0; i < it.di_table.Count(); i++)
             {
-                if (sys_inode_tt.tt[temp_id].di_table[i].id == id)
+                if (it.di_table[i].id == id)
                 {
-                    dn = sys_inode_tt.tt[temp_id].di_table[i];
-                    return dn;
+                    dn2 = it.di_table[i];
+                    return dn2;
                 }
             }
             return dn2;
@@ -235,10 +235,20 @@ namespace FileSysConsole
         //首次安装文件系统
         public bool Install()
         {
-            //设置超级管理员
+            //设置超级管理员和普通管理员
             User root = new User();
+            User user1 = new User(1001, "123");
+            User user2 = new User(1002, "123");
+            User user3 = new User(2001, "abc");
+            User user4 = new User(2002, "abc");
+            User user5 = new User(3001, "abc123");
             UserTable ut = new UserTable();
             ut.utable.Add(root);
+            ut.utable.Add(user1);
+            ut.utable.Add(user2);
+            ut.utable.Add(user3);
+            ut.utable.Add(user4);
+            ut.utable.Add(user5);
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             BinaryFormatter binFormat = new BinaryFormatter();
             fs.Position = 3 * SuperBlock.BLOCK_SIZE;//用户信息，从1024到2048，占第2个块
@@ -270,12 +280,16 @@ namespace FileSysConsole
                 sb.last_group_addr = new List<uint>();
                 for (uint i = 0; i < SuperBlock.BLOCK_IN_GROUP; i++) { sb.last_group_addr.Add(4000 + i); }//重置超级栈
                 //组长块格式化
-                for (uint i = 0; i < 32000; i++)
+                for (uint i = 0; i < 320; i++)
                 {
-                    BlockLeader bl = new BlockLeader();
-                    bl.next_blocks_num = SuperBlock.BLOCK_IN_GROUP;
+                    BlockLeader bl = new BlockLeader
+                    {
+                        next_blocks_num = SuperBlock.BLOCK_IN_GROUP
+                    };
                     for (uint j = 0; j < 128; j++)
-                    { bl.block_addr.Add(4000 + i * SuperBlock.BLOCK_IN_GROUP * SuperBlock.BLOCK_SIZE + j); }
+                    {
+                        bl.block_addr.Add(4000 + i * SuperBlock.BLOCK_IN_GROUP * SuperBlock.BLOCK_SIZE + j);
+                    }
                     fs.Position = 4000 + i * SuperBlock.BLOCK_IN_GROUP * SuperBlock.BLOCK_SIZE + 127;
                     binFormat.Serialize(fs, bl);
                 }
@@ -445,8 +459,8 @@ namespace FileSysConsole
 
         public void exeall()
         {
-            ReadFile("ddd");
-
+            Install();
+            Start();
         }
     }
 }
