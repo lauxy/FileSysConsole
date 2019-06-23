@@ -249,16 +249,29 @@ namespace FileSysConsole
         }
 
         /// <summary>
-        ///创建文件(夹)：分配i节点
+        /// 创建文件(夹)：分配i节点
         /// </summary>
         /// <param name="type"></param>
         /// <param name="fname"></param>
         /// <returns></returns>
         public bool Creat(ItemType type, string fname)
         {
-            //1,确保名字不冲突且不能有"/"
-            if (fname.Contains("/")) { Console.WriteLine("No Contains '/' !"); return false; }
-            DiskiNode fold_node = GetiNode(sys_current_user.current_folder);
+            uint curfolder = sys_current_user.current_folder;
+            //1,支持在指定的文件路径下创建文件(夹). [evise by Lau Xueyuan, 2019-06-24 01:33]
+            if (fname.Contains("/")) {
+                string[] filepath = fname.Split("/");
+                foreach (string folder in filepath)
+                {
+                    //返回当前目录下名字为folder的文件(夹)
+                    IEnumerable<DiskiNode> inode =
+                        from subid in GetiNode(curfolder).next_addr
+                        where GetiNode(subid).name == folder
+                        select GetiNode(subid);
+                    curfolder = inode.First().id;  //更改当前文件夹为folder，不改变用户项记录的当前文件夹
+                }
+                //curfolder即为搜索的根目录
+            }
+            DiskiNode fold_node = GetiNode(curfolder);
             if (IsNameConflict(fold_node, fname, type)) { Console.WriteLine("Name Conflict!"); return false; } ;
             //2,分配i节点,分配磁盘块,上级i节点更新,写回磁盘
             uint id = AllocAiNodeID();
