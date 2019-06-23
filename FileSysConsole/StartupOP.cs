@@ -15,10 +15,6 @@ namespace FileSysConsole
         public FileTable sys_file_table = new FileTable();//目录表目，精简的内存i节点，包含全部i节点
         public iNodeTT sys_inode_tt = new iNodeTT();
 
-        public Execute()
-        {
-
-        }
 
         //用户登录
         public bool Login()
@@ -118,6 +114,7 @@ namespace FileSysConsole
         {
             uint temp_id = sys_current_user.current_folder;
             DiskiNode temp_dn = new DiskiNode();
+            DiskiNode temp_dn2 = new DiskiNode();
             string[] paths;
             //若为绝对路径
             if (path[0] == '/')
@@ -127,64 +124,89 @@ namespace FileSysConsole
             }
             else { paths = path.Split(new char[] { '/' }); }
             temp_dn = GetiNode(temp_id);
-
             for (int i = 0; i < paths.Length; i++)
             {
-                if (temp_dn.next_addr == null) { Console.WriteLine("ERROR AT GetiNodeByPath: NO THIS FILE/FOLDER"); return temp_dn; }
-                bool have_found = false;
-                for (int j = 0; j < temp_dn.next_addr.Count(); j++)
+                if (paths[i] == ".") { }
+                else if(paths[i] == "..")
                 {
-                    DiskiNode temp_dn2 = GetiNode(temp_dn.next_addr[j]);
-                    if (temp_dn2.name == paths[i])
-                    {
-                        temp_dn = temp_dn2;
-                        have_found = true;
-                        break;
-                    }
+                    temp_dn = GetiNode(temp_dn.fore_addr);
                 }
-                if (!have_found) { Console.WriteLine("ERROR AT GetiNodeByPath: "); return temp_dn; }
+                else
+                {
+                    if (temp_dn.next_addr == null) { Console.WriteLine("ERROR AT GetiNodeByPath: NO THIS FILE/FOLDER"); return temp_dn; }
+                    bool have_found = false;
+                    for (int j = 0; j < temp_dn.next_addr.Count(); j++)
+                    {
+                        temp_dn2 = GetiNode(temp_dn.next_addr[j]);
+                        if (temp_dn2.name == paths[i])
+                        {
+                            temp_dn = temp_dn2;
+                            have_found = true;
+                            break;
+                        }
+                    }
+                    if (!have_found) { Console.WriteLine("ERROR AT GetiNodeByPath: NO WAY"); return temp_dn; }
+                }
             }
             return temp_dn;
         }
-        //分配i节点,更新磁盘的目录表目和i节点列表;mode=0为文件夹,=1为文件
-        //需要注意重名,注意文件夹/文件区别
-        public bool Creat(uint mode, string fname)
+
+        /// <summary>
+        /// 判断命名是否冲突，冲突返回true
+        /// </summary>
+        /// <param name="current_folder"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public bool IsNameConflict(DiskiNode fold_node,string name,ItemType type)
         {
-            //1,确保名字不冲突
-            DiskiNode fold_node = GetiNode(sys_current_user.current_folder);
             for (int i = 0; fold_node.next_addr != null && i < fold_node.next_addr.Count(); i++)
             {
                 DiskiNode temp_node = GetiNode(fold_node.next_addr[i]);
-                if (temp_node.name == fname)
-                {
-                    if (temp_node.block_num == 0 && mode == 0) { Console.WriteLine("Name Conflict"); return false; }
-                    else if (temp_node.block_num != 0 && mode != 0) { Console.WriteLine("Name Conflict"); return false; }
-                }
+                if (temp_node.name == name && temp_node.type == type)
+                    return true;
             }
+            return false;
+        }
+
+        /// <summary>
+        ///分配i节点，更新磁盘的目录表目和i节点列表，注意文件夹/文件区别
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="fname"></param>
+        /// <returns></returns>
+        public bool Creat(ItemType type, string fname)
+        {
+            //1,确保名字不冲突
+            DiskiNode fold_node = GetiNode(sys_current_user.current_folder);
+            if (IsNameConflict(fold_node, fname, type)) { return false; } ;
             //2,分配i节点,分配磁盘块,上级i节点更新,写回磁盘
             uint id = AllocAiNodeID();
-            DiskiNode dn;
-            if (mode == 0)
+            DiskiNode ndn;
+            if (type == ItemType.FOLDER)
             {
-                dn = new DiskiNode(id, fname, 0, sys_current_user.uid);
+                ndn = new DiskiNode(id, fname, 0, sys_current_user.uid);
             }
             else
             {
                 uint block_addr = AllocADiskBlock();
-                dn = new DiskiNode(id, fname, 1, sys_current_user.uid);
-                dn.next_addr.Add(block_addr);
+                ndn = new DiskiNode(id, fname, 1, sys_current_user.uid);
+                ndn.next_addr.Add(block_addr);
             }
-            dn.fore_addr = fold_node.id;
+            ndn.fore_addr = fold_node.id;
             fold_node.next_addr.Add(id);
-            FileItem temp_fi = new FileItem(dn);
+            FileItem temp_fi = new FileItem(ndn);
             sys_file_table.table.Add(temp_fi);
             if (sys_inode_tt.tt[id % 128] == null)
                 sys_inode_tt.tt[id % 128] = new iNodeTable();
-            sys_inode_tt.tt[id % 128].di_table.Add(dn);
+            sys_inode_tt.tt[id % 128].di_table.Add(ndn);
             UpdateDiskSFi(false, true, true);
             return true;
         }
-        //分配磁盘块,正常则返回块地址,错误则返回0
+
+        /// <summary>
+        /// 分配磁盘块,正常则返回块地址,错误则返回0,未写回超级块
+        /// </summary>
+        /// <returns></returns>
         public uint AllocADiskBlock()
         {
             uint block_addr = 0;
@@ -344,30 +366,81 @@ namespace FileSysConsole
         //删除文件
         public bool DeleteFile(string path)
         {
-            string[] paths = path.Split(new char[] { '/' });
-            uint temp_id = sys_current_user.current_folder;
-            DiskiNode temp_dn = new DiskiNode();
-            for (int i = 0; i < paths.Length; i++)
+            DiskiNode temp_dn = GetiNodeByPath(path);
+            if (temp_dn.type == ItemType.FOLDER) { Console.WriteLine("This is a folder!"); return false; }
+            else if(temp_dn.type == ItemType.FILE)
             {
-                //temp_dn = GetiNodeByName(paths[i], temp_id);
-                if (temp_dn.next_addr == null)
-                {
-                    return false;
-                }
-                temp_id = temp_dn.id;
-            }
-            if (temp_dn.block_num == 0) { Console.WriteLine("This is a folder!"); return false; }
-            else
-            {
-                RecycleiNode(temp_id, true);
+                RecycleiNode(temp_dn.id, true);
                 return true;
             }
+            return false;
         }
 
         //读取文件
         public string ReadFile(string path)
         {
-            return "test";
+            DiskiNode read_dn = GetiNodeByPath(path);
+            string file_content = "";
+            if (read_dn.type != ItemType.FILE) { return "This is a folder!"; }
+            else
+            {
+                FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                for (int i=0;i<read_dn.block_num;i++)
+                {
+                    byte[] byData = new byte[1024];
+                    fs.Position = read_dn.next_addr[i];
+                    fs.Read(byData, 0, byData.Length);
+                    file_content += byData.ToString();
+                }
+                fs.Close();
+                return file_content;
+            }
+        }
+
+        //写文件
+        public bool WriteFile(string path, string file_content)
+        {
+            DiskiNode wdn = GetiNodeByPath(path);
+            int len = (int) wdn.block_num;
+            //截取字符串
+            int num = (file_content.Length / (int)SuperBlock.BLOCK_SIZE) + 1;
+            //若写入字节大于原有磁盘块，分配新盘快
+            if (num > len) { for (int i = 0; i < num - len;wdn.next_addr.Add(AllocADiskBlock()), i++) ; }
+            //若写入字节小于原有磁盘块，回收旧盘块
+            else if (num < len)
+            {
+                for (int i = 0; i < len - num; i++)
+                {
+                    int addr_len = wdn.next_addr.Count();
+                    RecycleDiskBlock(wdn.next_addr[addr_len - 1]);
+                    wdn.next_addr.RemoveAt(addr_len - 1);
+                }
+            }
+            //逐块写入
+            FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            for (int i = 0; i < num; i++)
+            {
+                string file_block_temp = file_content.Substring(i * 1024, 1024);
+                byte[] byte_block = System.Text.Encoding.Default.GetBytes(file_block_temp);
+                fs.Position = wdn.next_addr[i];
+                fs.Write(byte_block, 0, byte_block.Length);
+            }
+            fs.Close();
+            //更新i节点，超级块，文件目录
+            UpdateDiskSFi();
+            return true;
+        }
+
+        //重命名
+        public bool Rename(string path, string name,ItemType type)
+        {
+            DiskiNode rdn = GetiNodeByPath(path);
+            if (IsNameConflict(rdn, name, type)) { return false; }
+            else
+            {
+                rdn.name = name;
+                return true;
+            }
         }
 
         public void exeall()
