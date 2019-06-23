@@ -1,5 +1,6 @@
 ﻿using System;
-
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FileSysConsole
 {
@@ -11,6 +12,7 @@ namespace FileSysConsole
             exe.exeall();
             Execute2 exe2 = new Execute2();
             exe2.exeall();
+
             //exe.Install();
             //exe.Start();
             //exe.Creat(1, "new1.cpp");

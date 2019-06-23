@@ -254,12 +254,17 @@ namespace FileSysConsole
         /// <param name="type"></param>
         /// <param name="fname"></param>
         /// <returns></returns>
-        public bool Creat(ItemType type, string fname)
+        public bool Create(ItemType type, string fname)
         {
             uint curfolder = sys_current_user.current_folder;
-            //1,支持在指定的文件路径下创建文件(夹). [evise by Lau Xueyuan, 2019-06-24 01:33]
+            //1,支持在指定的文件路径下创建文件(夹). [revise by Lau Xueyuan, 2019-06-24 01:33]
+            //此处为相对路径
             if (fname.Contains("/")) {
                 string[] filepath = fname.Split("/");
+                fname = filepath[filepath.Count() - 1];
+                List<string> tmp = filepath.ToList();
+                tmp.RemoveAt(filepath.Count() - 1);
+                filepath = tmp.ToArray();
                 foreach (string folder in filepath)
                 {
                     //返回当前目录下名字为folder的文件(夹)
@@ -269,7 +274,6 @@ namespace FileSysConsole
                         select GetiNode(subid);
                     curfolder = inode.First().id;  //更改当前文件夹为folder，不改变用户项记录的当前文件夹
                 }
-                //curfolder即为搜索的根目录
             }
             DiskiNode fold_node = GetiNode(curfolder);
             if (IsNameConflict(fold_node, fname, type)) { Console.WriteLine("Name Conflict!"); return false; } ;
