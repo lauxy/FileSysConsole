@@ -15,6 +15,7 @@ namespace FileSysTemp.FSBase
         public const uint BLOCK_SUM_NUM = 1024 * 1024 * 4;//块的总数量，4GB
         public const uint iNODE_SUM_NUM = 1024 * 50;      //i节点的总数量
         public const uint BLOCK_IN_GROUP = 128;           //每一组有128块
+        public uint CURRENT_INODE_NUM = 0;                //当前i结点数量
         public uint free_block_num = 1023 * 1024 * 4;     //空闲块的数量,4GB-4MB
         public uint free_inode_num = 1024 * 50;           //空闲i节点的数量
         public uint last_group_block_num = BLOCK_IN_GROUP;//最后一组的块的数量

@@ -1,8 +1,6 @@
 ﻿using FileSysTemp.FSBase;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using static FileSysConsole.DirectOp;
 
 namespace FileSysConsole
 {
@@ -13,9 +11,17 @@ namespace FileSysConsole
     {
         const uint BLOCK_SIZE = 1024;
 
+        const uint iNODE_SUM_NUM = 1024 * 50;      //i节点的总数量
+
         MemoryUser user = new MemoryUser(1,0);
 
         Execute startup = new Execute();
+
+        bool isCreateIndex = false;
+
+        FileTable filetable = new FileTable();
+
+        SuperBlock superblk = new SuperBlock();
 
         ///简化的i节点，只用于显示目录时使用
         public class SimplifiediNode
@@ -151,6 +157,62 @@ namespace FileSysConsole
             user.Destructor(); //释放资源
             Console.WriteLine("You have been logout successfully!");
             return issucceed;
+        }
+
+
+        /// <summary>
+        /// 全盘搜索一个文件，返回所有同名文件的i节点。
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns></returns>
+        public List<DiskiNode> SearchFile(string filename)
+        {
+            List<DiskiNode> reslist = new List<DiskiNode>();
+            if (!isCreateIndex)
+            {
+                //未建立索引，需要遍历全树   
+                Stack<DiskiNode> stack = new Stack<DiskiNode>();
+                bool[] flag = new bool[superblk.CURRENT_INODE_NUM]; //标记结点是否进过栈
+                for (int i = 0; i < superblk.CURRENT_INODE_NUM; i++)
+                    flag[i] = false;
+                DiskiNode root = new DiskiNode();
+                stack.Push(startup.GetiNode(0));
+                flag[0] = true;
+                while (stack.Count != 0)
+                {
+                    DiskiNode visit = stack.Peek();
+                    stack.Pop();
+                    if(visit.name == filename)
+                    {
+                        //找到一个与filename名字相同的文件(夹)
+                        reslist.Add(visit);
+                    }
+                    for(int i = visit.next_addr.Count - 1; i >= 0; i--)
+                    {
+                        if (!flag[visit.next_addr[i]])
+                        {
+                            stack.Push(startup.GetiNode(visit.next_addr[i]));
+                            flag[visit.next_addr[i]] = true;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                //已建立索引，全盘搜索只需要遍历目录表, 时间复杂度O(n)
+                foreach(FileItem item in filetable.table)
+                {
+                    if(item.name == filename)
+                    {
+                        reslist.Add(startup.GetiNode(item.inode_id));
+                    }
+                }
+            }
+            if(reslist.Count == 0)
+            {
+                Console.WriteLine("No file or folder named " + filename + " was found!");
+            }
+            return reslist;
         }
     }
 
