@@ -1,6 +1,8 @@
 ﻿using FileSysTemp.FSBase;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace FileSysConsole
 {
@@ -153,7 +155,6 @@ namespace FileSysConsole
                 bool[] flag = new bool[superblk.CURRENT_INODE_NUM]; //标记结点是否进过栈
                 for (int i = 0; i < superblk.CURRENT_INODE_NUM; i++)
                     flag[i] = false;
-                DiskiNode root = new DiskiNode();
                 stack.Push(startup.GetiNode(0));
                 flag[0] = true;
                 while (stack.Count != 0)
@@ -196,11 +197,56 @@ namespace FileSysConsole
         /// <summary>
         /// 在当前目录下搜索
         /// </summary>
+        /// <param name="path">指定从那个目录开始搜索</param>
         /// <param name="filename">要搜索的文件名</param>
         /// <returns>返回当前目录下所有符合的文件i结点</returns>
-        public List<DiskiNode> SearchInCurrentFolder(string filename)
+        public List<DiskiNode> SearchFromSpecificFolder(string path, string filename)
         {
+            List<DiskiNode> reslist = new List<DiskiNode>();
 
+            Stack<DiskiNode> stack = new Stack<DiskiNode>();
+            bool[] flag = new bool[superblk.CURRENT_INODE_NUM]; //标记结点是否进过栈
+            for (int i = 0; i < superblk.CURRENT_INODE_NUM; i++)
+                flag[i] = false;
+            uint curfolder = user.current_folder;
+            if (path != null)
+            {
+                //从path指定的目录开始搜索
+                string[] filepath = path.Split("/");
+
+                foreach (string folder in filepath)
+                {
+                    //返回当前目录下名字为folder的文件(夹)
+                    IEnumerable<DiskiNode> inode =
+                        from subid in startup.GetiNode(curfolder).next_addr
+                        where startup.GetiNode(subid).name == folder
+                        select startup.GetiNode(subid);
+                    curfolder = inode.First().id;  //更改当前文件夹为folder，不改变用户项记录的当前文件夹
+                }
+                //curfolder即为搜索的根目录
+            }
+
+            //从当前目录下开始搜索
+            stack.Push(startup.GetiNode(curfolder));
+            flag[user.current_folder] = true;
+            while (stack.Count != 0)
+            {
+                DiskiNode visit = stack.Peek();
+                stack.Pop();
+                if (visit.name == filename)
+                {
+                    reslist.Add(visit);
+                }
+                for (int i = visit.next_addr.Count - 1; i >= 0; i--)
+                {
+                    if (flag[visit.next_addr[i]] == false)
+                    {
+                        stack.Push(startup.GetiNode(visit.next_addr[i]));
+                        flag[visit.next_addr[i]] = true;
+                    }
+                }
+            }
+            return reslist;
         }
     }
 
