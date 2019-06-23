@@ -53,23 +53,21 @@ namespace FileSysTemp
         /// </summary>
         /// <param name="user">当前内存中的用户项</param>
         /// <returns>精简的i节点链表</returns>
-        //public List<SimplifiediNode> ShowCurrentDirectory(MemoryUser user)
-        //{
-        //    DiskiNode diriNode = GetiNode(user.current_folder);
-        //    List<SimplifiediNode> content = new List<SimplifiediNode>();
-        //    foreach (uint itemid in diriNode.next_addr)
-        //    {
-        //        DiskiNode subiNode = GetiNode(itemid);
-        //        SimplifiediNode fileorfolder = new SimplifiediNode();
-        //        fileorfolder.name = subiNode.name;
-        //        fileorfolder.size = subiNode.block_num * BLOCK_SIZE;
-        //        fileorfolder.reviseDate = subiNode.t_revise;
-        //        fileorfolder.type = subiNode.type;
-        //        content.Add(fileorfolder);
-        //    }
-
-
-
-        //}
+        public List<SimplifiediNode> ShowCurrentDirectory(MemoryUser user)
+        {
+            DiskiNode diriNode = GetiNode(user.current_folder);
+            List<SimplifiediNode> content = new List<SimplifiediNode>();
+            foreach (uint itemid in diriNode.next_addr)
+            {
+                DiskiNode subiNode = GetiNode(itemid);
+                SimplifiediNode fileorfolder = new SimplifiediNode();
+                fileorfolder.name = subiNode.name;
+                fileorfolder.size = subiNode.block_num * BLOCK_SIZE;
+                fileorfolder.reviseDate = subiNode.t_revise;
+                fileorfolder.type = subiNode.type;
+                content.Add(fileorfolder);
+            }
+            return content;
+        }
     }
 }
