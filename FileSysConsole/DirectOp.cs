@@ -4,8 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 
 
-namespace FileSysTemp
+namespace FileSysConsole
 {
+    public class Execute2
+    {
+        public void exeall()
+        {
+            //...
+        }
+    }
     /// <summary>
     /// 针对目录表项和内存i节点的操作集合
     /// </summary>
