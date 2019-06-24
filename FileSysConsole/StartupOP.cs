@@ -5,6 +5,7 @@ using FileSysTemp.FSBase;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace FileSysConsole
 {
@@ -178,9 +179,10 @@ namespace FileSysConsole
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public DiskiNode GetiNodeByPath(string path)
+        public List<DiskiNode> GetiNodeByPath(string path)
         {
             uint temp_id = sys_current_user.current_folder;
+            List<DiskiNode> tdn = new List<DiskiNode>();
             DiskiNode temp_dn = new DiskiNode(0,".",0,0), temp_dn2;
             string[] paths0;
             List<string> paths = new List<string>();
@@ -210,11 +212,12 @@ namespace FileSysConsole
                 }
                 else
                 {
-                    if (temp_dn.next_addr == null) { Console.WriteLine("ERROR AT GetiNodeByPath: NO THIS FILE/FOLDER");temp_dn.name = "."; return temp_dn; }
+                    if (temp_dn.next_addr == null) { Console.WriteLine("ERROR AT GetiNodeByPath: NO THIS FILE/FOLDER");temp_dn.name = "."; return tdn; }
                     bool have_found = false;
                     for (int j = 0; j < temp_dn.next_addr.Count(); j++)
                     {
                         temp_dn2 = GetiNode(temp_dn.next_addr[j]);
+                        Regex reg = new Regex(paths[i]);
                         if (temp_dn2.name == paths[i])
                         {
                             temp_dn = temp_dn2;
@@ -222,10 +225,10 @@ namespace FileSysConsole
                             break;
                         }
                     }
-                    if (!have_found) { Console.WriteLine("ERROR AT GetiNodeByPath: NO WAY"); temp_dn.name = "."; return temp_dn; }
+                    if (!have_found) { Console.WriteLine("ERROR AT GetiNodeByPath: NO WAY"); temp_dn.name = "."; return tdn; }
                 }
             }
-            return temp_dn;
+            return tdn;
         }
 
         /// <summary>
@@ -506,7 +509,7 @@ namespace FileSysConsole
         /// <returns></returns>
         public bool DeleteFile(string path)
         {
-            DiskiNode temp_dn = GetiNodeByPath(path);
+            DiskiNode temp_dn = GetiNodeByPath(path)[0];
             if (temp_dn.name == ".") { Console.WriteLine("No Such File."); return false; }
             Console.WriteLine(temp_dn.id);
             if (temp_dn.type == ItemType.FOLDER) { Console.WriteLine("This is a folder!"); return false; }
@@ -527,7 +530,7 @@ namespace FileSysConsole
         /// <returns></returns>
         public string ReadFile(string path)
         {
-            DiskiNode read_dn = GetiNodeByPath(path);
+            DiskiNode read_dn = GetiNodeByPath(path)[0];
             if (read_dn.name == ".") { Console.WriteLine("No Such File.");return ""; }
             string file_content = "";
             if (read_dn.type != ItemType.FILE) { return "This is a folder!"; }
@@ -554,7 +557,7 @@ namespace FileSysConsole
         /// <returns></returns>
         public bool WriteFile(string path, string file_content)
         {
-            DiskiNode wdn = GetiNodeByPath(path);
+            DiskiNode wdn = GetiNodeByPath(path)[0];
             if (wdn.name == ".") { Console.WriteLine("No Such File.");return false; }
             int len = (int) wdn.block_num;
             //截取字符串
@@ -600,7 +603,7 @@ namespace FileSysConsole
         /// <returns></returns>
         public bool Rename(string path, string name,ItemType type)
         {
-            DiskiNode rdn = GetiNodeByPath(path);
+            DiskiNode rdn = GetiNodeByPath(path)[0];
             if(rdn.name == ".") { Console.WriteLine("No Such File/Folder.");return false; }
             if (IsNameConflict(rdn, name, type)) { return false; }
             else
@@ -615,7 +618,7 @@ namespace FileSysConsole
         /// <param name="path"></param>
         public void ShowFile(string path)
         {
-            DiskiNode dn = GetiNodeByPath(path);
+            DiskiNode dn = GetiNodeByPath(path)[0];
             if (dn.name == ".") { Console.WriteLine("No Such Path."); }
             for(int i=0;i<dn.next_addr.Count();i++)
             {
@@ -627,21 +630,73 @@ namespace FileSysConsole
             }
         }
         /// <summary>
+        /// 复制旧i节点物理盘块到新i节点物理盘块，正常返回true
+        /// </summary>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        public bool CopyiNodeDisk(DiskiNode from, DiskiNode to)
+        {
+            if (from.next_addr.Count() != to.next_addr.Count()) { Console.WriteLine("From's block != To's block"); return false; }
+            else
+            {
+                int block_num = from.next_addr.Count();
+                FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                //一块一块地读，因为可能不连续
+                for(int i=0;i<block_num;i++)
+                {
+                    uint b_from = from.next_addr[i] * SuperBlock.BLOCK_SIZE;
+                    uint b_to = to.next_addr[i] * SuperBlock.BLOCK_SIZE;
+                    Byte[] b_content = new byte[SuperBlock.BLOCK_SIZE];
+                    fs.Position = b_from;
+                    fs.Read(b_content, 0, (int)SuperBlock.BLOCK_SIZE);
+                    fs.Position = b_to;
+                    fs.Write(b_content, 0, b_content.Length);
+                }
+                fs.Close();
+                return true;
+            }
+        }
+
+        public bool MatchString(string src, string tar)
+        {
+            string temp = "^" + tar + "$";
+            Regex reg = new Regex(@temp);
+            if (reg.IsMatch(src))
+                return true;
+            else
+                return false;
+        }
+
+        public void testReg()
+        {
+            string[] bs = { "c.txt","pc.txt","cvtxt"};
+            for(int i=0;i<bs.Length;i++)
+            {
+                if (MatchString(bs[i],"c.txt"))
+                {
+                    Console.WriteLine(bs[i]);
+                }
+            }
+
+        }
+        /// <summary>
         /// 运行测试
         /// </summary>
         public void exeall()
         {
             //Install();//安装文件系统，仅在首次运行时需要
-            Start();//启动文件系统
+            ///Start();//启动文件系统
             //Creat(ItemType.FILE, "test2.txt");//在当前目录创建文件
             //Creat(ItemType.FOLDER, "usr1");
             //OutputTT();
-            ShowFile("/");
-            //DeleteFile("test2.txt");
-            Console.WriteLine("-----------------");
             //ShowFile("/");
-            WriteFile("test2.txt", "123456789");
-            Console.WriteLine(ReadFile("test2.txt"));
+            //DeleteFile("test2.txt");
+            //Console.WriteLine("-----------------");
+            //ShowFile("/");
+            //WriteFile("test2.txt", "123456789");
+            //Console.WriteLine(ReadFile("test2.txt"));
+            testReg();
         }
     }
 }
