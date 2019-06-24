@@ -307,11 +307,45 @@ namespace FileSysConsole
         /// </summary>
         /// <param name="filename">源文件名(或带路径的文件名)，不能是一个文件夹！</param>
         /// <param name="tarpath">目的路径</param>
-        public void CopyFile(string filename, string tarpath)
+        public bool CopyFile(string filename, string tarpath)
         {
             List<DiskiNode> from = startup.GetiNodeByPath(filename);
             DiskiNode to = startup.GetiNodeByPath(tarpath).First();
+            List<DiskiNode> duplication = from; //from的副本
+            foreach(DiskiNode inode in duplication)
+            {
+                bool collision = false;
+                //冲突检查
+                foreach(uint id in to.next_addr)
+                {
+                    //发生同名同类型冲突
+                    if(inode.name == startup.GetiNode(id).name &&
+                        inode.type == startup.GetiNode(id).type)
+                    {
+                        collision = true;
+                        Console.WriteLine("cannot overwrite directory '" + tarpath + "/" + inode.name + "' with non-directory");
+                        break;
+                    }
+                }
+                if (collision == true) continue;
+                DiskiNode oldiNode = inode;
+                if (inode.type == ItemType.FOLDER) return false; //排除文件夹
+                inode.id = startup.AllocAiNodeID(); //分配一个i结点
+                inode.fore_addr = to.id;
+                inode.next_addr.Clear();
+                for(int i = 0; i < inode.block_num; i++)
+                {
+                    inode.next_addr.Add(startup.AllocADiskBlock());
+                }
+                inode.t_create = DateTime.Now;
+                inode.t_revise = DateTime.Now;
+                to.next_addr.Add(inode.id);
+                startup.CopyiNodeDisk(oldiNode, inode);
+            }
+            return true;
         }
+
+
     }
 
     public class Execute2
