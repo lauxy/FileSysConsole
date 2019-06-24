@@ -147,7 +147,8 @@ namespace FileSysConsole
         /// <returns>两字符串是否匹配（或相等）</returns>
         public bool MatchString(string src, string tar)
         {
-            string temp = "^" + tar + "$";
+            string temp1 = tar.Replace(".", @"\.");
+            string temp = "^" + temp1.Replace("~", ".+") + "$";
             Regex reg = new Regex(@temp);
             if (reg.IsMatch(src))
                 return true;
