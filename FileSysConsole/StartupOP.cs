@@ -175,6 +175,23 @@ namespace FileSysConsole
             return dn;
         }
         /// <summary>
+        /// DirectOp里的副本，重构时可以删掉
+        /// </summary>
+        /// <param name="src"></param>
+        /// <param name="tar"></param>
+        /// <returns></returns>
+        public bool MatchString(string src, string tar)
+        {
+            string temp1 = tar.Replace(".", @"\.");
+            string temp = "^" + temp1.Replace("~", ".+") + "$";
+            Regex reg = new Regex(@temp);
+            if (reg.IsMatch(src))
+                return true;
+            else
+                return false;
+        }
+
+        /// <summary>
         /// 输入路径，返回i节点结构
         /// </summary>
         /// <param name="path"></param>
@@ -182,8 +199,11 @@ namespace FileSysConsole
         public List<DiskiNode> GetiNodeByPath(string path)
         {
             uint temp_id = sys_current_user.current_folder;
-            List<DiskiNode> tdn = new List<DiskiNode>();
-            DiskiNode temp_dn = new DiskiNode(0,".",0,0), temp_dn2;
+            List<DiskiNode> dn_head = new List<DiskiNode>();
+            List<DiskiNode> dn_tail = new List<DiskiNode>();
+            DiskiNode err_dn = new DiskiNode(0, ".", 0, 0);
+            dn_tail.Add(err_dn);
+            DiskiNode temp_dn;
             string[] paths0;
             List<string> paths = new List<string>();
             //若为绝对路径
@@ -195,6 +215,9 @@ namespace FileSysConsole
             //相对路径
             else { paths0 = path.Split(new char[] { '/' }); }
             temp_dn = GetiNode(temp_id);
+            dn_head.Add(temp_dn);
+            dn_tail.Clear();
+            dn_tail.Add(temp_dn);
             //去空，如/usr//ui/
             for(int i=0;i<paths0.Length;i++)
             {
@@ -208,27 +231,56 @@ namespace FileSysConsole
                 if (paths[i] == ".") { }
                 else if(paths[i] == "..")
                 {
-                    temp_dn = GetiNode(temp_dn.fore_addr);
+                    dn_head.Clear();
+                    for(int j=0;j<dn_tail.Count();j++)
+                    {
+                        temp_dn = GetiNode(dn_tail[j].fore_addr);
+                        bool has_exist = false;
+                        for (int k = 0; k < dn_head.Count(); k++)
+                        {
+                            if (temp_dn.id == dn_head[k].id)
+                            {
+                                has_exist = true;
+                                break;
+                            }
+                        }
+                        if (!has_exist)
+                            dn_head.Add(temp_dn);
+                    }
                 }
                 else
                 {
-                    if (temp_dn.next_addr == null) { Console.WriteLine("ERROR AT GetiNodeByPath: NO THIS FILE/FOLDER");temp_dn.name = "."; return tdn; }
-                    bool have_found = false;
-                    for (int j = 0; j < temp_dn.next_addr.Count(); j++)
+                    dn_head.Clear();
+                    for(int j=0;j<dn_tail.Count();j++)
                     {
-                        temp_dn2 = GetiNode(temp_dn.next_addr[j]);
-                        Regex reg = new Regex(paths[i]);
-                        if (temp_dn2.name == paths[i])
+                        //还没到最后就匹配了文件，忽略这一条路
+                        if(dn_tail[j].type==ItemType.FILE && i != paths.Count() - 1)
                         {
-                            temp_dn = temp_dn2;
-                            have_found = true;
-                            break;
+
+                        }
+                        //重大错误，根本不应该出现，要是遇到直接返回错误
+                        else if (dn_tail[j].next_addr == null)
+                        {
+                            Console.WriteLine("ERROR AT GetiNodeByPath: NO THIS FILE/FOLDER");
+                            dn_head.Clear();
+                            dn_head.Add(err_dn);
+                            return dn_head;
+                        }
+                        //正常地匹配到了文件夹
+                        else
+                        {
+                            for(int k=0;k<dn_tail[j].next_addr.Count();k++)
+                            {
+                                temp_dn = GetiNode(dn_tail[j].next_addr[k]);
+                                if(MatchString(temp_dn.name,paths[i]))
+                                    dn_head.Add(temp_dn);
+                            }
                         }
                     }
-                    if (!have_found) { Console.WriteLine("ERROR AT GetiNodeByPath: NO WAY"); temp_dn.name = "."; return tdn; }
                 }
+                dn_tail = dn_head;
             }
-            return tdn;
+            return dn_head;
         }
 
         /// <summary>
@@ -658,17 +710,6 @@ namespace FileSysConsole
             }
         }
 
-        public bool MatchString(string src, string tar)
-        {
-            string temp1 = tar.Replace(".", @"\.");
-            string temp = "^" + temp1.Replace("~", ".+") + "$";
-            Regex reg = new Regex(@temp);
-            if (reg.IsMatch(src))
-                return true;
-            else
-                return false;
-        }
-
         public void testReg()
         {
             string[] bs = { "c.txt","pc.txt","cvtxt"};
@@ -697,7 +738,7 @@ namespace FileSysConsole
             //ShowFile("/");
             //WriteFile("test2.txt", "123456789");
             //Console.WriteLine(ReadFile("test2.txt"));
-            testReg();
+            //testReg();
         }
     }
 }
