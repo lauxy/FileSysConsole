@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace FileSysConsole
 {
@@ -146,19 +147,12 @@ namespace FileSysConsole
         /// <returns>两字符串是否匹配（或相等）</returns>
         public bool MatchString(string src, string tar)
         {
-            if (tar.Contains("*"))
-            {
-                string[] filter = tar.Split("*");
-                for(int i = 0; i < filter.Count(); i++)
-                {
-                    if (!src.Contains(filter[i]))
-                    {
-                        return false;
-                    }
-                }
+            string temp = "^" + tar + "$";
+            Regex reg = new Regex(@temp);
+            if (reg.IsMatch(src))
                 return true;
-            }
-            return src == tar;
+            else
+                return false;
         }
 
         /// <summary>
