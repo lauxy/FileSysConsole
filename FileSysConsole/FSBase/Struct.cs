@@ -43,6 +43,7 @@ namespace FileSysTemp.FSBase
         public uint id;                                //磁盘i节点ID
         public string name;                            //文件(夹)名
         public uint block_num;                         //关联的块数，也就是文件大小，若为0则为文件夹
+        public uint size;                              //文件(夹)大小
         public uint uid;                               //用户ID，1~1000用户组1，2~2000用户组2...
         public List<uint> next_addr = new List<uint>();//文件的磁盘块地址或者文件夹下的文件(夹)的i节点ID
         public uint fore_addr;                         //上层目录的i的ID

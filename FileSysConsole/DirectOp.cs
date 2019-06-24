@@ -345,6 +345,45 @@ namespace FileSysConsole
             return true;
         }
 
+        /// <summary>
+        /// 递归删除一个文件夹
+        /// </summary>
+        /// <param name="inode"></param>
+        private void DeleteAFolder(DiskiNode inode)
+        {
+            if(inode.type == ItemType.FOLDER)
+            {
+                List<DiskiNode> delList = new List<DiskiNode>();
+                delList = (from item in inode.next_addr
+                           select startup.GetiNode(item)).ToList();
+                foreach(DiskiNode item in delList)
+                {
+                    DeleteAFolder(item);
+                }
+                //删除自身（当前文件夹）
+                startup.RecycleiNode(inode.id);
+            }
+            else
+            {
+                //type == ItemType.FILE
+                startup.RecycleiNode(inode.id);
+            }
+        }
+
+        /// <summary>
+        /// 删除文件夹
+        /// </summary>
+        /// <param name="path">文件夹路径</param>
+        public void DeleteFolder(string path)
+        {
+            List<DiskiNode> dellist = startup.GetiNodeByPath(path);
+            foreach(DiskiNode item in dellist)
+            {
+                DeleteAFolder(item);
+            }
+        }
+
+        
 
     }
 
