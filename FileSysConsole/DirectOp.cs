@@ -310,6 +310,11 @@ namespace FileSysConsole
         {
             List<DiskiNode> from = startup.GetiNodeByPath(filename);
             DiskiNode to = startup.GetiNodeByPath(tarpath).First();
+            List<DiskiNode> duplication = from; //from的副本
+            foreach(DiskiNode inode in duplication)
+            {
+
+            }
         }
     }
 

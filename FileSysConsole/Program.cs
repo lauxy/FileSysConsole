@@ -8,8 +8,8 @@ namespace FileSysConsole
     {
         static void Main(string[] args)
         {
-            Execute exe = new Execute();
-            exe.exeall();
+            //Execute exe = new Execute();
+            //exe.exeall();
             //Execute2 exe2 = new Execute2();
             //exe2.exeall();
 
