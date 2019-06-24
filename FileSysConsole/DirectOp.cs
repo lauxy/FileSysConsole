@@ -202,7 +202,7 @@ namespace FileSysConsole
                 //已建立索引，全盘搜索只需要遍历目录表, 时间复杂度O(n)
                 foreach(FileItem item in filetable.table)
                 {
-                    if(item.name == filename)
+                    if(MatchString(item.name, filename))
                     {
                         reslist.Add(startup.GetiNode(item.inode_id));
                     }
@@ -269,6 +269,32 @@ namespace FileSysConsole
             }
             return reslist;
         }
+
+        /// <summary>
+        /// 移动一个文件filename或文件夹到另一个目录下tarpath
+        /// </summary>
+        /// <param name="filename">文件(夹)名(当前目录下的文件)或带相对路径的文件</param>
+        /// <param name="tarpath">移动到的目的地址</param>
+        /// <returns></returns>
+        public bool Move(string filename, string tarpath)
+        {
+            DiskiNode from = startup.GetiNodeByPath(filename);
+            DiskiNode to = startup.GetiNodeByPath(tarpath);
+            string fname = filename.Split("/").Last();
+            //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
+            foreach(uint id in startup.GetiNode(from.fore_addr).next_addr)
+            {
+                if(MatchString(startup.GetiNode(id).name, fname))
+                {
+                    startup.GetiNode(from.fore_addr).next_addr.Remove(id);
+                    break;
+                }
+            }
+            from.fore_addr = to.id;  //修改该文件(夹)父级指针
+            to.next_addr.Add(from.id);
+            return true;
+        }
+
     }
 
     public class Execute2
