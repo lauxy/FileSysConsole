@@ -275,26 +275,48 @@ namespace FileSysConsole
         /// </summary>
         /// <param name="filename">文件(夹)名(当前目录下的文件)或带相对路径的文件</param>
         /// <param name="tarpath">移动到的目的地址</param>
-        /// <returns></returns>
-        public bool Move(string filename, string tarpath)
+        public void Move(string filename, string tarpath)
         {
-            DiskiNode from = startup.GetiNodeByPath(filename);
+            //若为模糊输入，返回所有匹配结果的i结点
+            List<DiskiNode> fromlist = startup.GetiNodeByPath(filename);
             DiskiNode to = startup.GetiNodeByPath(tarpath);
-            string fname = filename.Split("/").Last();
+            string[] fname = (from item in fromlist
+                              select item.name).ToArray();  //获取所有匹配项的文件名
             //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
-            foreach(uint id in startup.GetiNode(from.fore_addr).next_addr)
+            foreach (uint id in startup.GetiNode(fromlist.First().fore_addr).next_addr)
             {
-                if(MatchString(startup.GetiNode(id).name, fname))
-                {
-                    startup.GetiNode(from.fore_addr).next_addr.Remove(id);
-                    break;
-                }
+                IEnumerable<uint> removei = from name in fname
+                                            where startup.GetiNode(id).name == name
+                                            select id;
+                startup.GetiNode(fromlist.First().fore_addr).next_addr.Remove(removei.First());
             }
-            from.fore_addr = to.id;  //修改该文件(夹)父级指针
-            to.next_addr.Add(from.id);
-            return true;
+            //再检查目标文件夹中是否有同名同类型文件冲突，有则直接覆盖
+            foreach (DiskiNode inode in fromlist)
+            {
+                IEnumerable<uint> collision = from id in to.next_addr
+                                              where startup.GetiNode(id).name == inode.name &&
+                                                    startup.GetiNode(id).type == inode.type
+                                              select id;
+                //每次最多只有一个文件(夹)出现冲突，解决冲突的办法是直接覆盖
+                if (collision.Count() > 0) 
+                {
+                    to.next_addr.Remove(collision.First());
+                }
+                inode.fore_addr = to.id;  //修改该文件(夹)父级指针
+                to.next_addr.Add(inode.id);
+            }
         }
 
+        /// <summary>
+        /// 复制一个文件到另一个目录下（不支持复制文件夹！）
+        /// </summary>
+        /// <param name="filename">源文件名(或带路径的文件名)，不能是一个文件夹！</param>
+        /// <param name="tarpath">目的路径</param>
+        public void CopyFile(string filename, string tarpath)
+        {
+            DiskiNode from = startup.GetiNodeByPath(filename);
+
+        }
     }
 
     public class Execute2
