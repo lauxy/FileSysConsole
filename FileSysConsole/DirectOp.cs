@@ -314,6 +314,20 @@ namespace FileSysConsole
             List<DiskiNode> duplication = from; //from的副本
             foreach(DiskiNode inode in duplication)
             {
+                bool collision = false;
+                //冲突检查
+                foreach(uint id in to.next_addr)
+                {
+                    //发生同名同类型冲突
+                    if(inode.name == startup.GetiNode(id).name &&
+                        inode.type == startup.GetiNode(id).type)
+                    {
+                        collision = true;
+                        Console.WriteLine("cannot overwrite directory '" + tarpath + "/" + inode.name + "' with non-directory");
+                        break;
+                    }
+                }
+                if (collision == true) continue;
                 DiskiNode oldiNode = inode;
                 if (inode.type == ItemType.FOLDER) return false; //排除文件夹
                 inode.id = startup.AllocAiNodeID(); //分配一个i结点
@@ -330,6 +344,8 @@ namespace FileSysConsole
             }
             return true;
         }
+
+
     }
 
     public class Execute2
