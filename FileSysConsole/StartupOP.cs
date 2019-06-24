@@ -660,7 +660,8 @@ namespace FileSysConsole
 
         public bool MatchString(string src, string tar)
         {
-            string temp = "^" + tar + "$";
+            string temp1 = tar.Replace(".", @"\.");
+            string temp = "^" + temp1.Replace("~", ".+") + "$";
             Regex reg = new Regex(@temp);
             if (reg.IsMatch(src))
                 return true;
@@ -673,7 +674,7 @@ namespace FileSysConsole
             string[] bs = { "c.txt","pc.txt","cvtxt"};
             for(int i=0;i<bs.Length;i++)
             {
-                if (MatchString(bs[i],"c.txt"))
+                if (MatchString(bs[i],"c.t~"))
                 {
                     Console.WriteLine(bs[i]);
                 }
