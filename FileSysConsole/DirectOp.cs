@@ -279,7 +279,7 @@ namespace FileSysConsole
         {
             //若为模糊输入，返回所有匹配结果的i结点
             List<DiskiNode> fromlist = startup.GetiNodeByPath(filename);
-            DiskiNode to = startup.GetiNodeByPath(tarpath);
+            DiskiNode to = startup.GetiNodeByPath(tarpath).First();
             string[] fname = (from item in fromlist
                               select item.name).ToArray();  //获取所有匹配项的文件名
             //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
@@ -314,8 +314,8 @@ namespace FileSysConsole
         /// <param name="tarpath">目的路径</param>
         public void CopyFile(string filename, string tarpath)
         {
-            DiskiNode from = startup.GetiNodeByPath(filename);
-
+            List<DiskiNode> from = startup.GetiNodeByPath(filename);
+            DiskiNode to = startup.GetiNodeByPath(tarpath).First();
         }
     }
 
