@@ -519,8 +519,40 @@ namespace FileSysConsole
                 DeleteAFolder(inode);
             }
         }
-    }
 
+        /// <summary>
+        /// 计算文件（夹）大小
+        /// </summary>
+        /// <param name="inode">文件(夹)的i结点</param>
+        /// <returns>返回文件(夹)大小</returns>
+        public uint CalFileOrFolderSize(DiskiNode inode)
+        {
+            uint size = 0;
+            if(inode.type == ItemType.FOLDER)
+            {
+                foreach(uint subid in inode.next_addr)
+                {
+                    size += CalFileOrFolderSize(startup.GetiNode(subid));
+                }               
+            }
+            else
+            {
+                //type == FILE
+                size = inode.block_num * BLOCK_SIZE;
+            }
+            return size;
+        }
+
+        /// <summary>
+        /// 用户权限检查
+        /// </summary>
+        /// <returns></returns>
+        public bool PermissionCheck()
+        {
+            return true;
+        }
+    }
+   
     public class Execute2
     {
         public void exeall()
