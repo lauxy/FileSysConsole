@@ -309,7 +309,7 @@ namespace FileSysConsole
         /// <param name="type"></param>
         /// <param name="fname"></param>
         /// <returns></returns>
-        public bool Create(ItemType type, string fname)
+        public DiskiNode Create(ItemType type, string fname)
         {
             uint curfolder = sys_current_user.current_folder;
             //1,支持在指定的文件路径下创建文件(夹). [revise by Lau Xueyuan, 2019-06-24 01:33]
@@ -331,7 +331,11 @@ namespace FileSysConsole
                 }
             }
             DiskiNode fold_node = GetiNode(curfolder);
-            if (IsNameConflict(fold_node, fname, type)) { Console.WriteLine("Name Conflict!"); return false; } ;
+            if (IsNameConflict(fold_node, fname, type)) //出现同名冲突
+            {
+                Console.WriteLine("Name Conflict!");
+                return new DiskiNode(0, ".", 0, 0);
+            }
             //2,分配i节点,分配磁盘块,上级i节点更新,写回磁盘
             uint id = AllocAiNodeID();
             DiskiNode ndn;
@@ -349,11 +353,12 @@ namespace FileSysConsole
             }
             ndn.fore_addr = fold_node.id;
             fold_node.next_addr.Add(id);
+            GetiNode(fold_node.id).next_addr.Add(id);
             if (sys_inode_tt.tt[id % 128] == null)
                 sys_inode_tt.tt[id % 128] = new iNodeTable();
             sys_inode_tt.tt[id % 128].di_table.Add(ndn);
             UpdateDiskSFi(false, true);
-            return true;
+            return ndn;
         }
 
         /// <summary>

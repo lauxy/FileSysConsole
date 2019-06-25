@@ -346,6 +346,51 @@ namespace FileSysConsole
         }
 
         /// <summary>
+        /// 复制一个文件夹
+        /// </summary>
+        /// <param name="src">原文件(夹)i结点</param>
+        /// <param name="tar">目的路径</param>
+        private void CopyAFolder(DiskiNode src, string tar)
+        {
+            string newName = tar + "/" + src.name;
+            if (src.type == ItemType.FOLDER)
+            {
+                //文件夹
+                List<DiskiNode> itemlist = new List<DiskiNode>();
+                itemlist = (from itemid in src.next_addr
+                            select startup.GetiNode(itemid)).ToList();
+                
+                DiskiNode newfolder = startup.Create(ItemType.FOLDER, newName);
+                if(newfolder.name != ".") //成功创建文件夹
+                {
+                    foreach (DiskiNode item in itemlist)
+                    {
+                        CopyAFolder(item, tar + "/" + newfolder);
+                    }
+                }
+            }
+            else
+            {
+                //文件
+                CopyFile(newName, tar);
+            }
+        }
+
+        /// <summary>
+        /// 复制文件夹
+        /// </summary>
+        /// <param name="fname">源文件名</param>
+        /// <param name="tarpath">目的目录</param>
+        public void CopyFolder(string fname, string tarpath)
+        {
+            List<DiskiNode> fromlist = startup.GetiNodeByPath(fname);
+            foreach(DiskiNode folder in fromlist)
+            {
+                CopyAFolder(folder, tarpath);
+            }
+        }
+
+        /// <summary>
         /// 递归删除一个文件夹
         /// </summary>
         /// <param name="inode"></param>
