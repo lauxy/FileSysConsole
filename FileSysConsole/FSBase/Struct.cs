@@ -15,13 +15,18 @@ namespace FileSysTemp.FSBase
         public const uint BLOCK_SUM_NUM = 1024 * 1024 * 4;//块的总数量，4GB
         public const uint iNODE_SUM_NUM = 1024 * 50;      //i节点的总数量
         public const uint BLOCK_IN_GROUP = 128;           //每一组有128块
+        public const uint SB_DISK_START = 0;              //超级块区磁盘起始块号
+        public const uint USER_DISK_START = 3;            //用户信息区磁盘起始块号
+        public const uint RECYCLEBINMAP_DISK_START = 10;  //回收站Map表区磁盘起始块号
+        public const uint iNODE_DISK_START = 100;         //i节点区磁盘起始块号
+        public const uint DATA_DISK_START = 4000;         //数据区磁盘起始块号
         public uint CURRENT_INODE_NUM = 0;                //当前i结点数量
         public uint free_block_num = 1023 * 1024 * 4;     //空闲块的数量,4GB-4MB
         public uint free_inode_num = 1024 * 50;           //空闲i节点的数量
         public uint last_group_block_num = BLOCK_IN_GROUP;//最后一组的块的数量
         public List<uint> last_group_addr;                //最后一组的块的地址(保留区大小为4000块)
         public bool change_flag = true;                   //超级块修改标志
-        public uint max_inode_id = 100;    //当前分配的最大i节点ID,因为有默认文件夹,所以第一次取个大一点的数值
+        public uint max_inode_id = 100;                   //当前分配的最大i节点ID,因为有默认文件夹,所以第一次取个大一点的数值
         public uint check_byte = 707197;                  //校验位
     }
 
