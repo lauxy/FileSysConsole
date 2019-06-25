@@ -275,19 +275,22 @@ namespace FileSysConsole
             //若为模糊输入，返回所有匹配结果的i结点
             List<DiskiNode> fromlist = startup.GetiNodeByPath(filename);
             DiskiNode to = startup.GetiNodeByPath(tarpath).First();
-            string[] fname = (from item in fromlist
-                              select item.name).ToArray();  //获取所有匹配项的文件名
-            //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
-            foreach (uint id in startup.GetiNode(fromlist.First().fore_addr).next_addr)
-            {
-                IEnumerable<uint> removei = from name in fname
-                                            where startup.GetiNode(id).name == name
-                                            select id;
-                startup.GetiNode(fromlist.First().fore_addr).next_addr.Remove(removei.First());
-            }
-            //再检查目标文件夹中是否有同名同类型文件冲突，有则直接覆盖
+            //string[] fname = (from item in fromlist
+            //                  select item.name).ToArray();  //获取所有匹配项的文件名
+            ////把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
+            //foreach (uint id in startup.GetiNode(fromlist.First().fore_addr).next_addr)
+            //{
+            //    IEnumerable<uint> removei = from name in fname
+            //                                where startup.GetiNode(id).name == name
+            //                                select id;
+            //    startup.GetiNode(fromlist.First().fore_addr).next_addr.Remove(removei.First());
+            //}
+            
             foreach (DiskiNode inode in fromlist)
             {
+                //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
+                startup.GetiNode(inode.fore_addr).next_addr.Remove(inode.id);
+                //再检查目标文件夹中是否有同名同类型文件冲突，有则直接覆盖
                 IEnumerable<uint> collision = from id in to.next_addr
                                               where startup.GetiNode(id).name == inode.name &&
                                                     startup.GetiNode(id).type == inode.type
@@ -428,8 +431,94 @@ namespace FileSysConsole
             }
         }
 
-        
+        /// <summary>
+        /// 回收站文件地址映射（用于还原）List<Dictionary<inode_id, fore_addr_id>>
+        /// </summary>
+        Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
 
+        /// <summary>
+        /// 将一个文件移入回收站
+        /// </summary>
+        /// <param name="path">文件的路径</param>
+        public void MoveToRecycleBin(string path)
+        {
+            List<DiskiNode> delitem = startup.GetiNodeByPath(path);
+            DiskiNode recyclebin = startup.GetiNode(1);   //获取回收站i结点
+            foreach(DiskiNode item in delitem)
+            {
+                recyclebinMap.Add(item.id, item.fore_addr);
+                startup.GetiNode(item.fore_addr).next_addr.Remove(item.id);
+                item.fore_addr = 1;
+                recyclebin.next_addr.Add(item.id); 
+            }
+        }
+
+        /// <summary>
+        /// 恢复回收站中的文件或文件夹
+        /// </summary>
+        /// <param name="name">文件名</param>
+        /// <returns>返回还原文件的i结点</returns>
+        public DiskiNode RestoreFromRecycleBin(string name)
+        {
+            DiskiNode recyclebin = startup.GetiNode(1);
+            List<uint> restore = (from item in recyclebin.next_addr
+                                  where startup.GetiNode(item).name == name
+                                  select item).ToList();
+            uint removeid = restore.First();
+            if (restore.Count() > 1)
+            {
+                for (int i = 0; i < restore.Count(); i++)
+                {
+                    DiskiNode inode = startup.GetiNode(restore[i]);
+                    Console.WriteLine("id: " + inode.id + ", name: " + inode.name + ", type: " + inode.type +
+                        ", size: " + inode.size + ", revise time: " + inode.t_revise);
+                }
+                Console.Write("Please select a file or folder to restore: ");
+                uint id = Convert.ToUInt32(Console.ReadLine());
+                IEnumerable<uint> tmpid = from c in restore
+                                          where c == id
+                                          select c;
+                //用户输入的文件不存在
+                if (tmpid.Count() == 0)
+                {
+                    Console.WriteLine("File or Directory does not exists!");
+                    return new DiskiNode(0, ".", 0, 0);
+                }
+                removeid = id;
+            }
+            DiskiNode node = startup.GetiNode(removeid);
+            node.fore_addr = recyclebinMap[removeid];
+            startup.GetiNode(node.fore_addr).next_addr.Add(removeid);
+            startup.GetiNode(1).next_addr.Remove(removeid);
+            return node;
+        }
+
+        /// <summary>
+        /// 显示回收站内容
+        /// </summary>
+        public void ShowRecycleBin()
+        {
+            DiskiNode recyclebin = startup.GetiNode(1);
+            foreach(uint id in recyclebin.next_addr)
+            {
+                DiskiNode inode = startup.GetiNode(id);
+                Console.WriteLine("name: " + inode.name + ", type: " + inode.type +
+                        ", size: " + inode.size + ", revise time: " + inode.t_revise);
+            }
+        }
+
+        /// <summary>
+        /// 清空回收站
+        /// </summary>
+        public void ClearRecycleBin()
+        {
+            DiskiNode recyclebin = startup.GetiNode(1);
+            foreach(uint item in recyclebin.next_addr)
+            {
+                DiskiNode inode = startup.GetiNode(item);
+                DeleteAFolder(inode);
+            }
+        }
     }
 
     public class Execute2
