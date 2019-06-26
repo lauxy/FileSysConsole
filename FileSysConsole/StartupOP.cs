@@ -772,15 +772,81 @@ namespace FileSysConsole
             Create(ItemType.FILE, "usr2001/2.cpp");
             Create(ItemType.FILE, "usr2001/main.cpp");
         }
+        FileTable filetable = new FileTable();
+
+        SuperBlock superblk = new SuperBlock();
+        /// <summary>
+        /// 复制一个文件到另一个目录下（不支持复制文件夹！）
+        /// </summary>
+        /// <param name="filename">源文件名(或带路径的文件名)，不能是一个文件夹！</param>
+        /// <param name="tarpath">目的路径</param>
+        public bool CopyFile(string filename, string tarpath)
+        {
+            List<DiskiNode> from = GetiNodeByPath(filename);
+            DiskiNode to = GetiNodeByPath(tarpath).First();
+            List<DiskiNode> duplication = from; //from的副本
+            foreach (DiskiNode inode in duplication)
+            {
+                bool collision = false;
+                //冲突检查
+                foreach (uint id in to.next_addr)
+                {
+                    //发生同名同类型冲突
+                    if (inode.name == GetiNode(id).name &&
+                        inode.type == GetiNode(id).type)
+                    {
+                        collision = true;
+                        Console.WriteLine("cannot overwrite directory '" + tarpath + "/" + inode.name + "' with non-directory");
+                        break;
+                    }
+                }
+                if (collision == true) continue;
+                DiskiNode newNode = inode;
+                if (inode.type == ItemType.FOLDER) return false; //排除文件夹
+                newNode.id = AllocAiNodeID(); //分配一个i结点
+                newNode.fore_addr = to.id;
+                newNode.next_addr.Clear();
+                for (int i = 0; i < inode.block_num; i++)
+                {
+                    newNode.next_addr.Add(AllocADiskBlock());
+                }
+                newNode.t_create = DateTime.Now;
+                newNode.t_revise = DateTime.Now;
+                to.next_addr.Add(newNode.id);
+                CopyiNodeDisk(inode, newNode);
+            }
+            return true;
+        }
+
+        public void ForwardtoADirectory(string foldername)
+        {
+            List<DiskiNode> inode = GetiNodeByPath(foldername);
+            if (inode.Count > 1)
+            {
+                Console.WriteLine("cd: too many arguments");
+                return;
+            }
+            else sys_current_user.current_folder = inode.First().id;
+        }
+
+        public void ShowCurrentDirectory()
+        {
+            DiskiNode diriNode = GetiNode(sys_current_user.current_folder);
+            foreach (uint itemid in diriNode.next_addr)
+            {
+                Console.WriteLine(GetiNode(itemid).name);
+            }
+        }
+
         /// <summary>
         /// 运行测试
         /// </summary>
         public void exeall()
         {
-            Install();//安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
+           // Install();//安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
             Start();//启动文件系统
-            InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
-
+                    // InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
+            
 
             Console.WriteLine("-----------------");
             Console.WriteLine("root:");
@@ -798,6 +864,24 @@ namespace FileSysConsole
             Console.WriteLine("root/usr2001:");
             ShowFile("/usr2001");
             Console.WriteLine("-----------------");
+
+            //DirectOp op = new DirectOp();
+            //op.ShowCurrentDirectory();
+            //Console.WriteLine("curFolder: " + GetiNode(sys_current_user.current_folder).name);
+            //Move("usr1001/Software/ss.txt", "usr1002");
+            CopyFile("usr1002/ss.txt", "usr1001/Software");
+
+            ForwardtoADirectory("usr1001/Software");
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+            ShowCurrentDirectory();
+            //ForwardtoADirectory("../..");
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+            //ShowCurrentDirectory();
+            //ForwardtoADirectory("usr1002");
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+            //ShowCurrentDirectory();
+
+            //Console.WriteLine(list.Count());
 
         }
     }

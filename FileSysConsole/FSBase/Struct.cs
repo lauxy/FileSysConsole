@@ -199,5 +199,4 @@ namespace FileSysTemp.FSBase
         public uint next_blocks_num;                    //下一组的磁盘块数量
         public List<uint> block_addr = new List<uint>();//下一组的每一块的地址
     }
-
 }

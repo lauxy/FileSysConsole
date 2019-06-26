@@ -25,6 +25,7 @@ namespace FileSysConsole
         SuperBlock superblk = new SuperBlock();
 
         ///简化的i节点，只用于显示目录时使用
+        ///简化的i节点，只用于显示目录时使用
         public class SimplifiediNode
         {
             public string name;          //文件(夹)名
@@ -38,38 +39,28 @@ namespace FileSysConsole
         /// </summary>
         /// <param name="user">当前内存中的用户项</param>
         /// <returns>精简的i节点链表</returns>
-        public List<SimplifiediNode> ShowCurrentDirectory()
+        public void ShowCurrentDirectory()
         {
             DiskiNode diriNode = startup.GetiNode(user.current_folder);
-            List<SimplifiediNode> content = new List<SimplifiediNode>();
             foreach (uint itemid in diriNode.next_addr)
             {
-                DiskiNode subiNode = startup.GetiNode(itemid);
-                SimplifiediNode fileorfolder = new SimplifiediNode();
-                fileorfolder.name = subiNode.name;
-                fileorfolder.size = subiNode.block_num * BLOCK_SIZE;
-                fileorfolder.reviseDate = subiNode.t_revise;
-                fileorfolder.type = subiNode.type;
-                content.Add(fileorfolder);
+                Console.WriteLine(startup.GetiNode(itemid).name);
             }
-            return content;
         }
 
         /// <summary>
-        /// 返回上一级目录，并修改用户当前所在文件夹的i结点
+        /// cd命令
         /// </summary>
-        /// <param name="user">当前内存中的用户项</param>
-        public void BacktoPreviousDirect()
+        /// <param name="foldername"></param>
+        public void ChangeCurrentDirectory(string foldername)
         {
-            DiskiNode curiNode = startup.GetiNode(user.current_folder);
-            uint preid = curiNode.fore_addr;
-            if (preid != curiNode.id)
+            List<DiskiNode> inode = startup.GetiNodeByPath(foldername);
+            if (inode.Count > 1)
             {
-                //非根目录
-                user.current_folder = preid;
+                Console.WriteLine("cd: too many arguments");
+                return;
             }
-            //preid等于本身i结点的id值，则说明当前目录是根目录，无法回退
-            return;
+            else user.current_folder = inode.First().id;
         }
 
         const uint MAX_USERNUM = 10; //内存中允许的最大用户数（同时在线）
@@ -164,48 +155,58 @@ namespace FileSysConsole
         public List<DiskiNode> SearchInAllDisk(string filename)
         {
             List<DiskiNode> reslist = new List<DiskiNode>();
+            bool isCreateIndex = false;
+            SuperBlock superblk = new SuperBlock();
+            FileTable filetable = new FileTable();
             if (!isCreateIndex)
             {
                 //未建立索引，需要遍历全树   
                 Stack<DiskiNode> stack = new Stack<DiskiNode>();
-                bool[] flag = new bool[superblk.CURRENT_INODE_NUM]; //标记结点是否进过栈
-                for (int i = 0; i < superblk.CURRENT_INODE_NUM; i++)
-                    flag[i] = false;
                 stack.Push(startup.GetiNode(0));
-                flag[0] = true;
                 while (stack.Count != 0)
                 {
                     DiskiNode visit = stack.Peek();
                     stack.Pop();
-                    if(MatchString(visit.name, filename))
+                    if (MatchString(visit.name, filename))
                     {
                         //找到一个与filename名字相同的文件(夹)
                         reslist.Add(visit);
                     }
-                    for(int i = visit.next_addr.Count - 1; i >= 0; i--)
+                    for (int i = visit.next_addr.Count() - 1; i >= 0; i--)
                     {
-                        if (!flag[visit.next_addr[i]])
-                        {
-                            stack.Push(startup.GetiNode(visit.next_addr[i]));
-                            flag[visit.next_addr[i]] = true;
-                        }
+                        stack.Push(startup.GetiNode(visit.next_addr[i]));
                     }
                 }
             }
             else
             {
                 //已建立索引，全盘搜索只需要遍历目录表, 时间复杂度O(n)
-                foreach(FileItem item in filetable.table)
+                foreach (FileItem item in filetable.table)
                 {
-                    if(MatchString(item.name, filename))
+                    if (MatchString(item.name, filename))
                     {
                         reslist.Add(startup.GetiNode(item.inode_id));
                     }
                 }
             }
-            if(reslist.Count == 0)
+            if (reslist.Count == 0)
             {
                 Console.WriteLine("No file or folder named " + filename + " was found!");
+            }
+            else
+            {
+                //输出
+                foreach (DiskiNode item in reslist)
+                {
+                    Console.WriteLine(item.name);
+                    if (item.type == ItemType.FOLDER)
+                    {
+                        foreach (uint subid in item.next_addr)
+                        {
+                            Console.WriteLine(startup.GetiNode(subid).name);
+                        }
+                    }
+                }
             }
             return reslist;
         }
@@ -219,32 +220,29 @@ namespace FileSysConsole
         public List<DiskiNode> SearchFromSpecificFolder(string path, string filename)
         {
             List<DiskiNode> reslist = new List<DiskiNode>();
-
             Stack<DiskiNode> stack = new Stack<DiskiNode>();
-            bool[] flag = new bool[superblk.CURRENT_INODE_NUM]; //标记结点是否进过栈
-            for (int i = 0; i < superblk.CURRENT_INODE_NUM; i++)
-                flag[i] = false;
             uint curfolder = user.current_folder;
-            if (path != null)
+            if (path != "")
             {
                 //从path指定的目录开始搜索
                 string[] filepath = path.Split("/");
-
                 foreach (string folder in filepath)
                 {
                     //返回当前目录下名字为folder的文件(夹)
-                    IEnumerable<DiskiNode> inode =
-                        from subid in startup.GetiNode(curfolder).next_addr
-                        where startup.GetiNode(subid).name == folder
-                        select startup.GetiNode(subid);
-                    curfolder = inode.First().id;  //更改当前文件夹为folder，不改变用户项记录的当前文件夹
+                    foreach (uint itemid in startup.GetiNode(curfolder).next_addr)
+                    {
+                        if (startup.GetiNode(itemid).name == folder)
+                        {
+                            curfolder = itemid; //改变当前目录（但不改变用户项中当前目录）
+                            break;
+                        }
+                    }
                 }
                 //curfolder即为搜索的根目录
             }
 
             //从当前目录下开始搜索
             stack.Push(startup.GetiNode(curfolder));
-            flag[user.current_folder] = true;
             while (stack.Count != 0)
             {
                 DiskiNode visit = stack.Peek();
@@ -252,14 +250,11 @@ namespace FileSysConsole
                 if (MatchString(visit.name, filename))
                 {
                     reslist.Add(visit);
+                    Console.WriteLine(visit.name);
                 }
                 for (int i = visit.next_addr.Count - 1; i >= 0; i--)
                 {
-                    if (flag[visit.next_addr[i]] == false)
-                    {
-                        stack.Push(startup.GetiNode(visit.next_addr[i]));
-                        flag[visit.next_addr[i]] = true;
-                    }
+                    stack.Push(startup.GetiNode(visit.next_addr[i]));
                 }
             }
             return reslist;
@@ -275,17 +270,6 @@ namespace FileSysConsole
             //若为模糊输入，返回所有匹配结果的i结点
             List<DiskiNode> fromlist = startup.GetiNodeByPath(filename);
             DiskiNode to = startup.GetiNodeByPath(tarpath).First();
-            //string[] fname = (from item in fromlist
-            //                  select item.name).ToArray();  //获取所有匹配项的文件名
-            ////把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
-            //foreach (uint id in startup.GetiNode(fromlist.First().fore_addr).next_addr)
-            //{
-            //    IEnumerable<uint> removei = from name in fname
-            //                                where startup.GetiNode(id).name == name
-            //                                select id;
-            //    startup.GetiNode(fromlist.First().fore_addr).next_addr.Remove(removei.First());
-            //}
-            
             foreach (DiskiNode inode in fromlist)
             {
                 //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
@@ -296,13 +280,14 @@ namespace FileSysConsole
                                                     startup.GetiNode(id).type == inode.type
                                               select id;
                 //每次最多只有一个文件(夹)出现冲突，解决冲突的办法是直接覆盖
-                if (collision.Count() > 0) 
+                if (collision.Count() > 0)
                 {
                     to.next_addr.Remove(collision.First());
                 }
                 inode.fore_addr = to.id;  //修改该文件(夹)父级指针
                 to.next_addr.Add(inode.id);
             }
+            startup.UpdateDiskSFi(false, true); //将变更写回磁盘
         }
 
         /// <summary>
@@ -544,12 +529,11 @@ namespace FileSysConsole
         }
 
         /// <summary>
-        /// 用户权限检查
+        /// 修改用户密码
         /// </summary>
-        /// <returns></returns>
-        public bool PermissionCheck()
+        public void RevisePassword()
         {
-            return true;
+
         }
     }
    
@@ -558,6 +542,7 @@ namespace FileSysConsole
         public void exeall()
         {
             //DirectOp op = new DirectOp();
+            //op.ShowCurrentDirectory();
             //MemoryUser user = new MemoryUser();
             //List<SimplifiediNode> reslist = op.ShowCurrentDirectory(user);
         }

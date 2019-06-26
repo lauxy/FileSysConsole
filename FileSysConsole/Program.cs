@@ -10,8 +10,8 @@ namespace FileSysConsole
         {
             Execute exe = new Execute();
             exe.exeall();
-            Execute2 exe2 = new Execute2();
-            exe2.exeall();
+            //Execute2 exe2 = new Execute2();
+            //exe2.exeall();
 
             //exe.Install();
             //exe.Start();
