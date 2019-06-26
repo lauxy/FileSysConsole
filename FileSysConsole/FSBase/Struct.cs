@@ -20,7 +20,6 @@ namespace FileSysTemp.FSBase
         public const uint RECYCLEBINMAP_DISK_START = 10;  //回收站Map表区磁盘起始块号
         public const uint iNODE_DISK_START = 100;         //i节点区磁盘起始块号
         public const uint DATA_DISK_START = 4000;         //数据区磁盘起始块号
-        public uint CURRENT_INODE_NUM = 0;                //当前i结点数量
         public uint free_block_num = 1023 * 1024 * 4;     //空闲块的数量,4GB-4MB
         public uint free_inode_num = 1024 * 50;           //空闲i节点的数量
         public uint last_group_block_num = BLOCK_IN_GROUP;//最后一组的块的数量
@@ -47,7 +46,6 @@ namespace FileSysTemp.FSBase
     {
         public uint id;                                //磁盘i节点ID
         public string name;                            //文件(夹)名
-        public uint block_num;                         //关联的块数，也就是文件大小，若为0则为文件夹
         public uint size;                              //文件(夹)大小
         public uint uid;                               //用户ID，1~1000用户组1，2~2000用户组2...
         public List<uint> next_addr = new List<uint>();//文件的磁盘块地址或者文件夹下的文件(夹)的i节点ID
@@ -56,11 +54,11 @@ namespace FileSysTemp.FSBase
         public DateTime t_revise;                      //文件(夹)修改时间
         public ItemType type;                          //类型：文件/文件夹
 
-        public DiskiNode(uint id, string name, uint block_num, uint uid)
+        public DiskiNode(uint id, string name, uint size, uint uid)
         {
             this.id = id;
             this.name = name;
-            this.block_num = block_num;
+            this.size = size;
             this.uid = uid;
         }
         public DiskiNode() { }
@@ -85,59 +83,6 @@ namespace FileSysTemp.FSBase
     }
 
     /// <summary>
-    /// 目录表目项
-    /// </summary>
-    [Serializable]
-    public class FileItem
-    {
-        public uint itemId;           //目录表项id
-        public List<uint> sub_ItemId; //当前目录下包含文件(夹)的目录表项id
-        public uint parent_itemId;    //当前目录的上一级目录的目录表项id
-        public uint inode_id;         //该目录表项对应的i节点id
-        public string name;           //文件(夹)名，用于搜索
-        public FileItem(uint curid, uint parentid, List<uint> subid, DiskiNode dn)
-        {
-            itemId = curid;
-            parent_itemId = parentid;
-            sub_ItemId = subid;
-            this.inode_id = dn.id;
-            this.name = dn.name;
-        }
-        public FileItem(DiskiNode dn)
-        {
-            this.inode_id = dn.id;
-            this.name = dn.name;
-        }
-    }
-
-    /// <summary>
-    /// 目录表目区
-    /// </summary>
-    [Serializable]
-    public class FileTable
-    {
-        public List<FileItem> table = new List<FileItem>();
-
-        /// <summary>
-        /// 搜索同名文件(夹)
-        /// </summary>
-        /// <param name="fname">文件(夹)名</param>
-        /// <returns>所有同名文件(夹)的集合</returns>
-        public List<uint> getiNodeId(string fname)
-        {
-            List<uint> res = new List<uint>();
-            foreach (FileItem item in table)
-            {
-                if (item.name == fname)
-                {
-                    res.Add(item.inode_id);
-                }
-            }
-            return res;
-        }
-    }
-
-    /// <summary>
     /// 当前内存里的用户项
     /// </summary>
     public class MemoryUser
@@ -146,6 +91,7 @@ namespace FileSysTemp.FSBase
         public uint uid;                               //用户uid
         public uint current_folder;                    //当前所在文件夹的i节点ID
         public List<uint> open_file = new List<uint>();//用户打开文件表
+        public string newpassword;                     //用户新密码
         public MemoryUser(uint uid, uint cf)
         {
             this.uid = uid;

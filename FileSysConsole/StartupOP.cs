@@ -11,11 +11,15 @@ namespace FileSysConsole
 {
     public class Execute
     {
-        public MemoryUser sys_current_user = new MemoryUser(0, 0);//当前登录用户，登录写好要后修改current_user！！！！！！！！！
+        public MemoryUser sys_current_user = new MemoryUser(0, 0);//当前登录用户，登录写好要后修改current_user！！！！！！！！！TODO
         public SuperBlock sys_sb = new SuperBlock();//超级块
-        public FileTable sys_file_table = new FileTable();//目录表目，精简的内存i节点，包含全部i节点
         public iNodeTT sys_inode_tt = new iNodeTT();
-
+        const uint MAX_USERNUM = 10; //内存中允许的最大用户数（同时在线）
+        uint cur_usernum = 0;        //当前内存中驻留的用户数量
+        /// <summary>
+        /// 回收站文件地址映射（用于还原）List<Dictionary<inode_id, fore_addr_id>>
+        /// </summary>
+        Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
 
         /// <summary>
         /// 输出所有i节点表
@@ -33,8 +37,71 @@ namespace FileSysConsole
                 Console.WriteLine("");
             }
         }
+        /// <summary>
+        /// 用户登录文件系统
+        /// </summary>
+        /// <param name="uid">用户id</param>
+        /// <param name="password">用户密码</param>
+        /// <returns>登录是否成功</returns>
+        public bool LoginSys(uint uid, string password)
+        {
+            List<User> users = LoadUsersInfofromDisk();
+            bool isExist = false;
+            User curUser = new User();
+            foreach (User user in users)
+            {
+                if (user.uid == uid)
+                {
+                    isExist = true;
+                    curUser.uid = user.uid;
+                    curUser.password = user.password;
+                    break;
+                }
+            }
+            if (!isExist)
+            {
+                //用户不存在
+                Console.WriteLine("This account is not available, please check whether user " + uid.ToString() + " exists or not!");
+                return false;
+            }
+            if (curUser.password == password)
+            {
+                //密码输入正确
+                if (cur_usernum < MAX_USERNUM)
+                {
+                    //内存中同时在线用户数少于最大用户数限制，用户可以正常登录
+                    MemoryUser user = new MemoryUser(curUser.uid, curUser.current_folder);
+                }
+                else
+                {
+                    Console.WriteLine("Too much users in the system, waited to login!");
+                    return false;
+                }
+            }
+            else
+            {
+                //密码输入错误
+                Console.WriteLine("Incorrect password, Login Failure!");
+                return false;
+            }
+            //正常退出，用户登录成功！
+            return true;
+        }
 
-        //用户登录
+        /// <summary>
+        /// 退出文件系统
+        /// </summary>
+        /// <param name="uid">用户id</param>
+        /// <returns>退出成功与否</returns>
+        public bool LogoutSys()
+        {
+            bool issucceed = StoreUserInfotoDisk(sys_current_user.uid, sys_current_user.current_folder);
+            sys_current_user.Destructor(); //释放资源
+            UpdateDiskSFi();
+            Console.WriteLine("You have been logout successfully!");
+            return issucceed;
+        }
+        //用户登录，暂时为了测程序好测，这里要改！！！！！！！！TODO
         public bool Login()
         {
             //TODO:用户登录模块，登录成功则修改current_user并返回true，否则返回false
@@ -53,7 +120,11 @@ namespace FileSysConsole
             {
                 if(uid==userlist[i].uid)
                 {
+                    //修改当前用户的当前工作文件夹
                     userlist[i].current_folder = curfolder;
+                    //更新密码
+                    userlist[i].password = sys_current_user.newpassword;
+                    //写回磁盘
                     FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
                     BinaryFormatter binFormat = new BinaryFormatter();
                     fs.Position = SuperBlock.USER_DISK_START * SuperBlock.BLOCK_SIZE;
@@ -75,8 +146,6 @@ namespace FileSysConsole
             fs.Position = SuperBlock.USER_DISK_START * SuperBlock.BLOCK_SIZE;
             List<User> userslist = (List<User>)binFormat.Deserialize(fs);
             fs.Close();
-            //For Test
-            //Console.WriteLine(userslist[2].password);
             return userslist;
         }
         /// <summary>
@@ -116,7 +185,6 @@ namespace FileSysConsole
                 return false;
             }
         }
-
         /// <summary>
         /// 更新磁盘的超级块或i节点，默认全写回(true,true)，第一个参数决定超级块是否写回，第二个是i节点
         /// </summary>
@@ -316,7 +384,6 @@ namespace FileSysConsole
             }
             return false;
         }
-
         /// <summary>
         /// 创建文件(夹)：分配i节点
         /// </summary>
@@ -377,7 +444,6 @@ namespace FileSysConsole
             UpdateDiskSFi(false, true);
             return ndn;
         }
-
         /// <summary>
         /// 分配磁盘块,正常则返回块地址,错误则返回0,未写回超级块
         /// </summary>
@@ -407,8 +473,6 @@ namespace FileSysConsole
             }
             return block_addr;
         }
-
-
         /// <summary>
         /// 首次安装文件系统，分配超级块、用户、i节点、组长块，返回true(成功)或false(失败)
         /// </summary>
@@ -508,7 +572,6 @@ namespace FileSysConsole
             fs.Close();
             return true;
         }
-
         /// <summary>
         /// 清除一个磁盘块，写满\0
         /// </summary>
@@ -525,14 +588,13 @@ namespace FileSysConsole
             fs.Close();
             return true;
         }
-
         /// <summary>
         /// 回收磁盘块
         /// </summary>
         /// <param name="block_addr"></param>
         /// <returns></returns>
         public bool RecycleDiskBlock(uint block_addr)
-        {
+        { 
             EraseBlock(block_addr);
             //若最后一组未满
             if (sys_sb.last_group_block_num < SuperBlock.BLOCK_IN_GROUP)
@@ -617,7 +679,85 @@ namespace FileSysConsole
             }
             return false;
         }
+        /// <summary>
+        /// 递归删除一个文件夹
+        /// </summary>
+        /// <param name="inode"></param>
+        private void DeleteAFolder(DiskiNode inode)
+        {
+            if (inode.type == ItemType.FOLDER)
+            {
+                List<DiskiNode> delList = new List<DiskiNode>();
+                delList = (from item in inode.next_addr
+                           select GetiNode(item)).ToList();
+                foreach (DiskiNode item in delList)
+                {
+                    DeleteAFolder(item);
+                }
+                //删除自身（当前文件夹）
+                RecycleiNode(inode.id);
+            }
+            else
+            {
+                //type == ItemType.FILE
+                RecycleiNode(inode.id);
+            }
+        }
+        /// <summary>
+        /// 删除文件夹
+        /// </summary>
+        /// <param name="path">文件夹路径</param>
+        public void DeleteFolder(string path)
+        {
+            List<DiskiNode> dellist = GetiNodeByPath(path);
+            foreach (DiskiNode item in dellist)
+            {
+                DeleteAFolder(item);
+            }
+        }
+        /// <summary>
+        /// 复制一个文件夹
+        /// </summary>
+        /// <param name="src">原文件(夹)i结点</param>
+        /// <param name="tar">目的路径</param>
+        private void CopyAFolder(DiskiNode src, string tar)
+        {
+            string newName = tar + "/" + src.name;
+            if (src.type == ItemType.FOLDER)
+            {
+                //文件夹
+                List<DiskiNode> itemlist = new List<DiskiNode>();
+                itemlist = (from itemid in src.next_addr
+                            select GetiNode(itemid)).ToList();
 
+                DiskiNode newfolder = Create(ItemType.FOLDER, newName);
+                if (newfolder.name != ".") //成功创建文件夹
+                {
+                    foreach (DiskiNode item in itemlist)
+                    {
+                        CopyAFolder(item, tar + "/" + newfolder);
+                    }
+                }
+            }
+            else
+            {
+                //文件
+                CopyFile(newName, tar);
+            }
+        }
+        /// <summary>
+        /// 复制文件夹
+        /// </summary>
+        /// <param name="fname">源文件名</param>
+        /// <param name="tarpath">目的目录</param>
+        public void CopyFolder(string fname, string tarpath)
+        {
+            List<DiskiNode> fromlist = GetiNodeByPath(fname);
+            foreach (DiskiNode folder in fromlist)
+            {
+                CopyAFolder(folder, tarpath);
+            }
+        }
         /// <summary>
         /// 通过路径读取文件
         /// </summary>
@@ -632,7 +772,7 @@ namespace FileSysConsole
             else
             {
                 FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                for (int i=0;i<read_dn.block_num;i++)
+                for (int i=0;i<read_dn.size;i++)
                 {
                     byte[] byData = new byte[1024];
                     fs.Position = read_dn.next_addr[i];
@@ -643,7 +783,6 @@ namespace FileSysConsole
                 return file_content;
             }
         }
-
         /// <summary>
         /// 通过路径写文件
         /// </summary>
@@ -654,7 +793,7 @@ namespace FileSysConsole
         {
             DiskiNode wdn = GetiNodeByPath(path)[0];
             if (wdn.name == ".") { Console.WriteLine("No Such File.");return false; }
-            int len = (int) wdn.block_num;
+            int len = (int) wdn.size;
             //截取字符串
             int num = (file_content.Length / (int)SuperBlock.BLOCK_SIZE) + 1;
             //Console.WriteLine("num:" + num.ToString());
@@ -672,7 +811,6 @@ namespace FileSysConsole
                     wdn.next_addr.RemoveAt(addr_len - 1);
                 }
             }
-
             //逐块写入
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             for (int i = 0; i < num; i++)
@@ -688,7 +826,6 @@ namespace FileSysConsole
             UpdateDiskSFi();
             return true;
         }
-
         /// <summary>
         /// 通过路径重命名文件(夹)
         /// </summary>
@@ -749,7 +886,6 @@ namespace FileSysConsole
                 return true;
             }
         }
-
         public void testReg()
         {
             string[] bs = { "c.txt","pc.txt","cvtxt"};
@@ -772,9 +908,6 @@ namespace FileSysConsole
             Create(ItemType.FILE, "usr2001/2.cpp");
             Create(ItemType.FILE, "usr2001/main.cpp");
         }
-        FileTable filetable = new FileTable();
-
-        SuperBlock superblk = new SuperBlock();
         /// <summary>
         /// 复制一个文件到另一个目录下（不支持复制文件夹！）
         /// </summary>
@@ -784,8 +917,7 @@ namespace FileSysConsole
         {
             List<DiskiNode> from = GetiNodeByPath(filename);
             DiskiNode to = GetiNodeByPath(tarpath).First();
-            List<DiskiNode> duplication = from; //from的副本
-            foreach (DiskiNode inode in duplication)
+            foreach (DiskiNode inode in from)
             {
                 bool collision = false;
                 //冲突检查
@@ -801,53 +933,306 @@ namespace FileSysConsole
                     }
                 }
                 if (collision == true) continue;
-                DiskiNode newNode = inode;
                 if (inode.type == ItemType.FOLDER) return false; //排除文件夹
-                newNode.id = AllocAiNodeID(); //分配一个i结点
-                newNode.fore_addr = to.id;
-                newNode.next_addr.Clear();
-                for (int i = 0; i < inode.block_num; i++)
+                DiskiNode newiNode = new DiskiNode(AllocAiNodeID(), inode.name, inode.size, sys_current_user.uid)
                 {
-                    newNode.next_addr.Add(AllocADiskBlock());
+                    fore_addr = to.id
+                };
+                for (int i = 0; i < inode.size; i++)
+                {
+                    newiNode.next_addr.Add(AllocADiskBlock());
                 }
-                newNode.t_create = DateTime.Now;
-                newNode.t_revise = DateTime.Now;
-                to.next_addr.Add(newNode.id);
-                CopyiNodeDisk(inode, newNode);
+                newiNode.t_create = DateTime.Now;
+                newiNode.t_revise = DateTime.Now;
+                if (sys_inode_tt.tt[newiNode.id % 128] == null)
+                    sys_inode_tt.tt[newiNode.id % 128] = new iNodeTable();
+                sys_inode_tt.tt[newiNode.id % 128].di_table.Add(newiNode);
+                to.next_addr.Add(newiNode.id);
+                CopyiNodeDisk(inode, newiNode);
             }
+            UpdateDiskSFi(true, true);
             return true;
         }
-
-        public void ForwardtoADirectory(string foldername)
+        /// <summary>
+        /// 移动一个文件filename或文件夹到另一个目录下tarpath
+        /// </summary>
+        /// <param name="filename">文件(夹)名(当前目录下的文件)或带相对路径的文件</param>
+        /// <param name="tarpath">移动到的目的地址</param>
+        public void Move(string filename, string tarpath)
+        {
+            //若为模糊输入，返回所有匹配结果的i结点
+            List<DiskiNode> fromlist = GetiNodeByPath(filename);
+            DiskiNode to = GetiNodeByPath(tarpath).First();
+            foreach (DiskiNode inode in fromlist)
+            {
+                //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
+                GetiNode(inode.fore_addr).next_addr.Remove(inode.id);
+                //再检查目标文件夹中是否有同名同类型文件冲突，有则直接覆盖
+                IEnumerable<uint> collision = from id in to.next_addr
+                                              where GetiNode(id).name == inode.name &&
+                                                    GetiNode(id).type == inode.type
+                                              select id;
+                //每次最多只有一个文件(夹)出现冲突，解决冲突的办法是直接覆盖
+                if (collision.Count() > 0)
+                {
+                    to.next_addr.Remove(collision.First());
+                }
+                inode.fore_addr = to.id;  //修改该文件(夹)父级指针
+                to.next_addr.Add(inode.id);
+            }
+            UpdateDiskSFi(false, true); //将变更写回磁盘
+        }
+        /// <summary>
+        /// 进入某一文件夹
+        /// </summary>
+        /// <param name="foldername"></param>
+        public void ChangeCurrentDirectory(string foldername)
         {
             List<DiskiNode> inode = GetiNodeByPath(foldername);
-            if (inode.Count > 1)
+            if (inode.Count() > 1)
             {
-                Console.WriteLine("cd: too many arguments");
-                return;
+                if(!(inode.Count()==2 && inode[0].name == inode[1].name))
+                {
+                    Console.WriteLine("cd: too many arguments");
+                    return;
+                }
+            }
+            if (inode[0].type == ItemType.FILE)
+            {
+                Console.WriteLine("This is a FILE.");
             }
             else sys_current_user.current_folder = inode.First().id;
         }
+        /// <summary>
+        /// 将一个文件移入回收站
+        /// </summary>
+        /// <param name="path">文件的路径</param>
+        public void MoveToRecycleBin(string path)
+        {
+            List<DiskiNode> delitem = GetiNodeByPath(path);
+            DiskiNode recyclebin = GetiNode(1);   //获取回收站i结点
+            foreach (DiskiNode item in delitem)
+            {
+                recyclebinMap.Add(item.id, item.fore_addr);
+                GetiNode(item.fore_addr).next_addr.Remove(item.id);
+                item.fore_addr = 1;
+                recyclebin.next_addr.Add(item.id);
+            }
+        }
+        /// <summary>
+        /// 全盘搜索一个文件（支持模糊查找）
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns>返回所有同名文件的i节点</returns>
+        public List<DiskiNode> SearchInAllDisk(string filename)
+        {
+            List<DiskiNode> reslist = new List<DiskiNode>();
+            //未建立索引，需要遍历全树   
+            Stack<DiskiNode> stack = new Stack<DiskiNode>();
+            stack.Push(GetiNode(0));
+            while (stack.Count != 0)
+            {
+                DiskiNode visit = stack.Peek();
+                stack.Pop();
+                if (MatchString(visit.name, filename))
+                {
+                    //找到一个与filename名字相同的文件(夹)
+                    reslist.Add(visit);
+                }
+                for (int i = visit.next_addr.Count() - 1; i >= 0; i--)
+                {
+                    stack.Push(GetiNode(visit.next_addr[i]));
+                }
+            }
+            if (reslist.Count == 0)
+            {
+                Console.WriteLine("No file or folder named " + filename + " was found!");
+            }
+            else
+            {
+                //输出
+                foreach (DiskiNode item in reslist)
+                {
+                    Console.WriteLine(item.name);
+                    if (item.type == ItemType.FOLDER)
+                    {
+                        foreach (uint subid in item.next_addr)
+                        {
+                            Console.WriteLine(GetiNode(subid).name);
+                        }
+                    }
+                }
+            }
+            return reslist;
+        }
+        /// <summary>
+        /// 在当前目录下搜索（支持模糊查找）
+        /// </summary>
+        /// <param name="path">指定从那个目录开始搜索</param>
+        /// <param name="filename">要搜索的文件名</param>
+        /// <returns>返回当前目录下所有符合的文件i结点</returns>
+        public List<DiskiNode> SearchFromSpecificFolder(string path, string filename)
+        {
+            List<DiskiNode> reslist = new List<DiskiNode>();
+            Stack<DiskiNode> stack = new Stack<DiskiNode>();
+            uint curfolder = sys_current_user.current_folder;
+            if (path != "")
+            {
+                //从path指定的目录开始搜索
+                string[] filepath = path.Split("/");
+                foreach (string folder in filepath)
+                {
+                    //返回当前目录下名字为folder的文件(夹)
+                    foreach (uint itemid in GetiNode(curfolder).next_addr)
+                    {
+                        if (GetiNode(itemid).name == folder)
+                        {
+                            curfolder = itemid; //改变当前目录（但不改变用户项中当前目录）
+                            break;
+                        }
+                    }
+                }
+                //curfolder即为搜索的根目录
+            }
 
+            //从当前目录下开始搜索
+            stack.Push(GetiNode(curfolder));
+            while (stack.Count != 0)
+            {
+                DiskiNode visit = stack.Peek();
+                stack.Pop();
+                if (MatchString(visit.name, filename))
+                {
+                    reslist.Add(visit);
+                    Console.WriteLine(visit.name);
+                }
+                for (int i = visit.next_addr.Count - 1; i >= 0; i--)
+                {
+                    stack.Push(GetiNode(visit.next_addr[i]));
+                }
+            }
+            return reslist;
+        }
+        /// <summary>
+        /// 恢复回收站中的文件或文件夹
+        /// </summary>
+        /// <param name="name">文件名</param>
+        /// <returns>返回还原文件的i结点</returns>
+        public DiskiNode RestoreFromRecycleBin(string name)
+        {
+            DiskiNode recyclebin = GetiNode(1);
+            List<uint> restore = (from item in recyclebin.next_addr
+                                  where GetiNode(item).name == name
+                                  select item).ToList();
+            uint removeid = restore.First();
+            if (restore.Count() > 1)
+            {
+                for (int i = 0; i < restore.Count(); i++)
+                {
+                    DiskiNode inode = GetiNode(restore[i]);
+                    Console.WriteLine("id: " + inode.id + ", name: " + inode.name + ", type: " + inode.type +
+                        ", size: " + inode.size + ", revise time: " + inode.t_revise);
+                }
+                Console.Write("Please select a file or folder to restore: ");
+                uint id = Convert.ToUInt32(Console.ReadLine());
+                IEnumerable<uint> tmpid = from c in restore
+                                          where c == id
+                                          select c;
+                //用户输入的文件不存在
+                if (tmpid.Count() == 0)
+                {
+                    Console.WriteLine("File or Directory does not exists!");
+                    return new DiskiNode(0, ".", 0, 0);
+                }
+                removeid = id;
+            }
+            DiskiNode node = GetiNode(removeid);
+            node.fore_addr = recyclebinMap[removeid];
+            GetiNode(node.fore_addr).next_addr.Add(removeid);
+            GetiNode(1).next_addr.Remove(removeid);
+            return node;
+        }
+        /// <summary>
+        /// 显示回收站内容
+        /// </summary>
+        public void ShowRecycleBin()
+        {
+            DiskiNode recyclebin = GetiNode(1);
+            foreach (uint id in recyclebin.next_addr)
+            {
+                DiskiNode inode = GetiNode(id);
+                Console.WriteLine("name: " + inode.name + ", type: " + inode.type +
+                        ", size: " + inode.size + ", revise time: " + inode.t_revise);
+            }
+        }
+        /// <summary>
+        /// 清空回收站
+        /// </summary>
+        public void ClearRecycleBin()
+        {
+            DiskiNode recyclebin = GetiNode(1);
+            foreach (uint item in recyclebin.next_addr)
+            {
+                DiskiNode inode = GetiNode(item);
+                DeleteAFolder(inode);
+            }
+        }
+        /// <summary>
+        /// 计算文件（夹）大小
+        /// </summary>
+        /// <param name="inode">文件(夹)的i结点</param>
+        /// <returns>返回文件(夹)大小</returns>
+        public uint CalFileOrFolderSize(DiskiNode inode)
+        {
+            uint size = 0;
+            if (inode.type == ItemType.FOLDER)
+            {
+                foreach (uint subid in inode.next_addr)
+                {
+                    size += CalFileOrFolderSize(GetiNode(subid));
+                }
+            }
+            else
+            {
+                size = inode.size;
+            }
+            return size;
+        }
+        /// <summary>
+        /// 展示当前文件夹的情况
+        /// </summary>
         public void ShowCurrentDirectory()
         {
             DiskiNode diriNode = GetiNode(sys_current_user.current_folder);
+            if (diriNode.next_addr.Count() == 0)
+            {
+                Console.WriteLine("There is no file/folder.");
+            }
+            else
+            {
+                Console.WriteLine("|Type\t\t|Size\t\t|Owner\t\t|ID\t\t|Name\t\t");
+                Console.WriteLine("|---------------|---------------|---------------|---------------|---------------");
+            }
             foreach (uint itemid in diriNode.next_addr)
             {
-                Console.WriteLine(GetiNode(itemid).name);
+                DiskiNode ndn = GetiNode(itemid);
+                uint ssize = (ndn.type==ItemType.FILE)?(ndn.size):(CalFileOrFolderSize(ndn));
+                string strsize;
+                if (ssize >= 1024) { strsize = (ssize/1024).ToString() + " MB"; }
+                else { strsize = ssize.ToString() + " KB"; }
+                Console.WriteLine("|" + ndn.type + "\t\t|" + strsize + "\t\t|" + ndn.uid + "\t\t|" + ndn.id+ "\t\t|" + ndn.name + "\t\t");
             }
         }
-
         /// <summary>
         /// 运行测试
         /// </summary>
         public void exeall()
         {
-           // Install();//安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
+            //Install();//安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
             Start();//启动文件系统
-                    // InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
-            
+            //InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
 
+            
             Console.WriteLine("-----------------");
             Console.WriteLine("root:");
             ShowFile("/");
@@ -865,15 +1250,19 @@ namespace FileSysConsole
             ShowFile("/usr2001");
             Console.WriteLine("-----------------");
 
+
             //DirectOp op = new DirectOp();
             //op.ShowCurrentDirectory();
             //Console.WriteLine("curFolder: " + GetiNode(sys_current_user.current_folder).name);
             //Move("usr1001/Software/ss.txt", "usr1002");
-            CopyFile("usr1002/ss.txt", "usr1001/Software");
 
-            ForwardtoADirectory("usr1001/Software");
-            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+
+            //CopyFile("usr2001/2.cpp", "usr1001/Software");
+            ChangeCurrentDirectory("usr1001");
             ShowCurrentDirectory();
+
+
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
             //ForwardtoADirectory("../..");
             //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
             //ShowCurrentDirectory();
