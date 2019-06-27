@@ -66,6 +66,8 @@ namespace FileSysTemp.FSBase
             this.name = name;
             this.size = size;
             this.uid = authority;
+
+          //  Console.WriteLine("Test Info: this.uid = " + this.uid.Keys);
         }
 
         /// <summary>

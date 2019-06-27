@@ -490,6 +490,7 @@ namespace FileSysConsole
             DiskiNode ndn;
             Dictionary<uint, uint> author = new Dictionary<uint, uint>();
             author.Add(sys_current_user.uid, 7);
+            if (sys_current_user.uid != 0) author.Add(0, 7);
             if (type == ItemType.FOLDER)
             {
                 ndn = new DiskiNode(id, fname, 0, author)
@@ -506,9 +507,10 @@ namespace FileSysConsole
                 };
                 ndn.next_addr.Add(block_addr);
             }
-            author.Clear();
             ndn.fore_addr = fold_node.id;
             fold_node.next_addr.Add(id);
+            ndn.t_create = DateTime.Now;
+            ndn.t_revise = DateTime.Now;
             if (sys_inode_tt.tt[id % 128] == null)
                 sys_inode_tt.tt[id % 128] = new iNodeTable();
             sys_inode_tt.tt[id % 128].di_table.Add(ndn);
@@ -559,7 +561,7 @@ namespace FileSysConsole
                 root,
                 user1,
                 user2,
-                user3,
+                user3
             };
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             BinaryFormatter binFormat = new BinaryFormatter();
@@ -591,15 +593,15 @@ namespace FileSysConsole
         {
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             BinaryFormatter binFormat = new BinaryFormatter();
-            Dictionary<uint, uint> author = new Dictionary<uint, uint>();
-            author.Add(0, 7); //uid零号超级管理员对root具有全部权限
+            Dictionary<uint, uint> author1 = new Dictionary<uint, uint>();
+            author1.Add(0, 7); //uid零号超级管理员对root具有全部权限
             //若是超级管理员格式化磁盘
             //重置超级块
             SuperBlock sb = new SuperBlock();
             //创建root文件夹
-            DiskiNode root_inode = new DiskiNode(0, "root", 0, author){fore_addr = 0, type = ItemType.FOLDER };
+            DiskiNode root_inode = new DiskiNode(0, "root", 0, author1){fore_addr = 0, type = ItemType.FOLDER };
             //创建回收站
-            DiskiNode recycle_inode = new DiskiNode(1, "recyclebin", 0, author) { fore_addr = 0,type=ItemType.FOLDER };
+            DiskiNode recycle_inode = new DiskiNode(1, "recyclebin", 0, author1) { fore_addr = 0,type=ItemType.FOLDER };
             Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
             //把root和回收站添加到i节点列表里
             iNodeTT ins_tt = new iNodeTT();
@@ -608,26 +610,29 @@ namespace FileSysConsole
             ins_tt.tt[1] = new iNodeTable();
             ins_tt.tt[1].di_table.Add(recycle_inode);
             root_inode.next_addr.Add(recycle_inode.id);
-            author.Clear();
+
             //初始化用户文件夹
-            author.Add(1001, 7);
-            DiskiNode usr1 = new DiskiNode(2, "usr1001", 0, author) { type = ItemType.FOLDER };
+            Dictionary<uint, uint> author2 = new Dictionary<uint, uint>();
+            author2.Add(1001, 7); author2.Add(0, 7);
+            DiskiNode usr1 = new DiskiNode(2, "usr1001", 0, author2) { type = ItemType.FOLDER };
             ins_tt.tt[2] = new iNodeTable();
             ins_tt.tt[2].di_table.Add(usr1);
-            author.Clear();
-            author.Add(1002, 7);
-            DiskiNode usr2 = new DiskiNode(3, "usr1002", 0, author) { type = ItemType.FOLDER };
+
+            Dictionary<uint, uint> author3 = new Dictionary<uint, uint>();
+            author3.Add(1002, 7); author3.Add(0, 7);
+            DiskiNode usr2 = new DiskiNode(3, "usr1002", 0, author3) { type = ItemType.FOLDER };
             ins_tt.tt[3] = new iNodeTable();
             ins_tt.tt[3].di_table.Add(usr2);
-            author.Clear();
-            author.Add(2001, 7);
-            DiskiNode usr3 = new DiskiNode(4, "usr2001", 0, author) { type = ItemType.FOLDER };
+
+            Dictionary<uint, uint> author4 = new Dictionary<uint, uint>();
+            author4.Add(2001, 7); author4.Add(0, 7);
+            DiskiNode usr3 = new DiskiNode(4, "usr2001", 0, author4) { type = ItemType.FOLDER };
             ins_tt.tt[4] = new iNodeTable();
             ins_tt.tt[4].di_table.Add(usr3);
             root_inode.next_addr.Add(usr1.id);
             root_inode.next_addr.Add(usr2.id);
             root_inode.next_addr.Add(usr3.id);
-            author.Clear();
+            
             //重置超级栈
             sb.last_group_addr = new List<uint>();
             for (uint i = 0; i < SuperBlock.BLOCK_IN_GROUP; i++) { sb.last_group_addr.Add((4000+i)* SuperBlock.BLOCK_SIZE); }
@@ -828,7 +833,6 @@ namespace FileSysConsole
                 List<DiskiNode> itemlist = new List<DiskiNode>();
                 itemlist = (from itemid in src.next_addr
                             select GetiNode(itemid)).ToList();
-
                 DiskiNode newfolder = Create(ItemType.FOLDER, newName);
                 if (newfolder.name != ".") //成功创建文件夹
                 {
@@ -1381,35 +1385,217 @@ namespace FileSysConsole
             return size;
         }
         /// <summary>
+        /// 比较两个文件/文件夹
+        /// </summary>
+        /// <param name="path1"></param>
+        /// <param name="path2"></param>
+        /// <param name="inode"></param>
+        /// <returns></returns>
+        public bool ComparedThem(string path1, string path2, bool inode)
+        {
+            string str1 = ReadFile(path1);
+            string str2 = ReadFile(path2);
+            if (!inode)
+            {
+                if (str1 == str2) return true;
+                else return false;
+            }
+            else
+            {
+                DiskiNode dn1 = GetiNodeByPath(path1)[0];
+                DiskiNode dn2 = GetiNodeByPath(path2)[0];
+                if (str1 == str2 && dn1.name == dn2.name && dn1.size == dn2.size && dn1.t_create == dn2.t_create && dn1.t_revise == dn2.t_revise && dn1.uid == dn2.uid) return true;
+                else return false;
+            }
+        }
+        /// <summary>
+        /// 输出i节点详情
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="addr"></param>
+        public void ShowDetail(string path, bool addr)
+        {
+            DiskiNode ndn = GetiNodeByPath(path)[0];
+            Console.WriteLine("|Type\t\t|Size\t\t|Owner\t\t|ID\t\t|Name\t\t");
+            Console.WriteLine("|---------------|---------------|---------------|---------------|---------------");
+            Console.WriteLine("|" + ndn.type + "\t\t|" + ndn.size + " KB\t\t|" + ndn.uid + "\t\t|" + ndn.id + "\t\t|" + ndn.name + "\t\t");
+            if (addr)
+                for (int i = 0; i < ndn.next_addr.Count; i++)
+                    Console.WriteLine(ndn.next_addr[i] + "|");
+        }
+        /// <summary>
         /// 展示当前文件夹的情况
         /// </summary>
-        public void ShowCurrentDirectory()
+        public void ShowDirectory(string path = ".", string order = "type", bool lite = true)
+        {
+            iNodeTable it = new iNodeTable();
+            DiskiNode diriNode;
+            if (path == ".")
+            { diriNode = GetiNode(sys_current_user.current_folder); }
+            else { diriNode = GetiNodeByPath(path)[0]; }
+            foreach (uint itemid in diriNode.next_addr)
+            {
+                DiskiNode dn = GetiNode(itemid);
+                it.di_table.Add(dn);
+            }
+            if (lite) ShowiNodeListLite(it, order);
+            else ShowiNodeList(it, order);
+        }
+        /// <summary>
+        /// 展示当前文件夹的情况LITE版本
+        /// </summary>
+        /// <param name="it"></param>
+        /// <param name="order"></param>
+        public void ShowiNodeListLite(iNodeTable it, string order)
+        {
+            DiskiNode testdn = GetiNode(0);
+           // Console.WriteLine(testdn.uid.Keys);
+            if (it.di_table.Count == 0)
+            {
+                Console.WriteLine("There is no file/folder.");
+            }
+            else
+            {
+                for (int i = 0; it.di_table[i].type == ItemType.FOLDER && i < it.di_table.Count; i++)
+                {
+                    it.di_table[i].size = CalFileOrFolderSize(it.di_table[i]);
+                }
+                if (order == "name") it.di_table.Sort((a, b) => a.name.CompareTo(b.name));
+                else if (order == "type") it.di_table.Sort((a, b) => a.type.CompareTo(b.type));
+                else if (order == "size") it.di_table.Sort((a, b) => a.size.CompareTo(b.size));
+                else if (order == "create") it.di_table.Sort((a, b) => a.t_create.CompareTo(b.t_create));
+                else if (order == "revise") it.di_table.Sort((a, b) => a.t_revise.CompareTo(b.t_revise));
+            }
+            for (int i = 0; i < it.di_table.Count; i++)
+            {
+                DiskiNode ndn = it.di_table[i];
+                Console.WriteLine(ndn.name);
+            }
+        }
+        /// <summary>
+        /// 展示当前文件夹的情况
+        /// </summary>
+        public void ShowiNodeList(iNodeTable it, string order)
         {
             DiskiNode diriNode = GetiNode(sys_current_user.current_folder);
+            /*
             if(!new uint[] { 4,5,6,7 }.Contains(diriNode.uid[sys_current_user.uid]))
             {
                 Console.WriteLine("You do not have sufficient permissions to view this folder!");
                 return;
             }
+            */
             if (diriNode.next_addr.Count() == 0)
             {
                 Console.WriteLine("There is no file/folder.");
             }
             else
             {
+                for (int i = 0; it.di_table[i].type == ItemType.FOLDER && i < it.di_table.Count; i++)
+                {
+                    it.di_table[i].size = CalFileOrFolderSize(it.di_table[i]);
+                }
+                if (order == "name") it.di_table.Sort((a, b) => a.name.CompareTo(b.name));
+                else if (order == "type") it.di_table.Sort((a, b) => a.type.CompareTo(b.type));
+                else if (order == "size") it.di_table.Sort((a, b) => a.size.CompareTo(b.size));
+                else if (order == "create") it.di_table.Sort((a, b) => a.t_create.CompareTo(b.t_create));
+                else if (order == "revise") it.di_table.Sort((a, b) => a.t_revise.CompareTo(b.t_revise));
                 Console.WriteLine("|Type\t\t|Size\t\t|Owner\t\t|ID\t\t|Name\t\t");
                 Console.WriteLine("|---------------|---------------|---------------|---------------|---------------");
             }
-            foreach (uint itemid in diriNode.next_addr)
+            for (int i = 0; i < it.di_table.Count; i++)
             {
-                DiskiNode ndn = GetiNode(itemid);
-                uint ssize = (ndn.type==ItemType.FILE)?(ndn.size):(CalFileOrFolderSize(ndn));
+                DiskiNode ndn = it.di_table[i];
+                uint ssize = ndn.size;
                 string strsize;
-                if (ssize >= 1024) { strsize = (ssize/1024).ToString() + " MB"; }
+                if (ssize >= 1024) { strsize = (ssize / 1024).ToString() + " MB"; }
                 else { strsize = ssize.ToString() + " KB"; }
-                Console.WriteLine("|" + ndn.type + "\t\t|" + strsize + "\t\t|" + ndn.uid + "\t\t|" + ndn.id+ "\t\t|" + ndn.name + "\t\t");
+                Console.WriteLine("|" + ndn.type + "\t\t|" + strsize + "\t\t|" + ndn.uid.FirstOrDefault().Key + "\t\t|" + ndn.id + "\t\t|" + ndn.name + "\t\t");
             }
         }
+
+        /// <summary>
+        /// 获取可能的子级权限
+        /// </summary>
+        /// <param name="pareauth">父级权限值</param>
+        /// <param name="self_subauth">自定义子级权限值</param>
+        /// <returns>所有可能的子级权限值</returns>
+        private bool GetSubAuthority(uint pareauth, uint self_subauth)
+        {
+            uint[] res = new uint[] { };
+            switch (pareauth)
+            {
+                case 0: res = new uint[] { 0 }; break;
+                case 1: res = new uint[] { 1 }; break;
+                case 2: res = new uint[] { 2 }; break;
+                case 3: res = new uint[] { 1, 2, 3 }; break;
+                case 4: res = new uint[] { 4 }; break;
+                case 5: res = new uint[] { 1, 4, 5 }; break;
+                case 6: res = new uint[] { 2, 4, 6 }; break;
+                case 7: res = new uint[] { 1, 2, 3, 4, 5, 6, 7 }; break;
+            }
+            if (res.Contains(self_subauth)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 给目标用户赋权
+        /// </summary>
+        /// <param name="fname">操作文件的文件名</param>
+        /// <param name="anousr">目标用户</param>
+        /// <param name="authority">权限值</param>
+        /// <returns>是否赋权限成功</returns>
+        public bool AssignAuthority(string fname, uint anousr, uint authority)
+        {
+            List<DiskiNode> inodelist = GetiNodeByPath(fname);
+            if (inodelist.Count() > 1)
+            {
+                //是否找到了多个符号要求的目标，若是，则报错
+                Console.WriteLine("Too many arguments!");
+                return false;
+            }
+            if (authority < 0 || authority > 7
+                || !GetSubAuthority(inodelist.First().uid[sys_current_user.uid], authority))
+            {
+                //检查权限值是否合法
+                Console.WriteLine("Illegal value of permission!");
+                return false;
+            }
+            inodelist.First().uid.Add(anousr, authority);
+            return true;
+        }
+
+        /// <summary>
+        /// 回收另一个用户的权限对文件的(目前只限超级管理员回收其他用户的权限)
+        /// </summary>
+        /// <param name="fname">文件名</param>
+        /// <param name="anousr">指定用户</param>
+        /// <param name="newauth">新权限值</param>
+        /// <returns></returns>
+        public bool RecycleAuthority(string fname, uint anousr, uint newauth)
+        {
+            if (sys_current_user.uid != 0)
+            {
+                Console.WriteLine("You do not have sufficient permissions to recycle others' authorities!");
+                return false;
+            }
+            List<DiskiNode> inode = GetiNodeByPath(fname);
+            if (inode.Count() > 1)
+            {
+                //是否找到了多个符号要求的目标，若是，则报错
+                Console.WriteLine("Too many arguments!");
+                return false;
+            }
+            if(newauth < 0 || newauth > 7 || !GetSubAuthority(inode.First().uid[anousr], newauth))
+            {
+                //检查权限值是否合法
+                Console.WriteLine("Illegal value of permission!");
+                return false;
+            }
+            inode.First().uid[anousr] = newauth;
+            return true;
+        }
+
         /// <summary>
         /// 运行测试
         /// </summary>
@@ -1428,9 +1614,15 @@ namespace FileSysConsole
             //}
             //bool isStart = Start();//启动文件系统
             //if (!isStart) return;
-            //InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
+            //InitializationForTest();//批处理，创建一些文件和文件夹!!!首次运行时需要，之后注释掉!!!
 
-            Console.WriteLine(new uint[] { 2, 3, 6, 7 }.Contains<uint>(3));
+            //CopyFolder("usr2001", "usr1001");
+            //ChangeCurrentDirectory("usr1001");
+            //ShowDirectory();
+            uint[] test = GetSubAuthority(7);
+            Console.WriteLine(test.Count());
+
+            //Console.WriteLine(new uint[] { 2, 3, 6, 7 }.Contains<uint>(3));
             //Console.WriteLine("-----------------");
             //Console.WriteLine("root:");
             //ShowFile("/");
