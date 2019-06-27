@@ -6,6 +6,8 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace FileSysConsole
 {
@@ -774,6 +776,7 @@ namespace FileSysConsole
                 FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
                 for (int i=0;i<read_dn.size;i++)
                 {
+                    //Console.WriteLine(read_dn.next_addr[i]);
                     byte[] byData = new byte[1024];
                     fs.Position = read_dn.next_addr[i];
                     fs.Read(byData, 0, byData.Length);
@@ -798,7 +801,7 @@ namespace FileSysConsole
             int num = (file_content.Length / (int)SuperBlock.BLOCK_SIZE) + 1;
             //Console.WriteLine("num:" + num.ToString());
             //Console.WriteLine("len:" + len.ToString());
-            Console.WriteLine("addr"+wdn.next_addr[0]);
+            //Console.WriteLine("addr:"+wdn.next_addr[0]);
             //若写入字节大于原有磁盘块，分配新盘快
             if (num > len) { for (int i = 0; i < num - len;wdn.next_addr.Add(AllocADiskBlock()), i++) ; }
             //若写入字节小于原有磁盘块，回收旧盘块
@@ -1258,17 +1261,19 @@ namespace FileSysConsole
 
 
             //CopyFile("usr2001/2.cpp", "usr1001/Software");
-            ChangeCurrentDirectory("usr1001");
+            ChangeCurrentDirectory("usr1001/Software");
             ShowCurrentDirectory();
-
-
-            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
-            //ForwardtoADirectory("../..");
-            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
-            //ShowCurrentDirectory();
-            //ForwardtoADirectory("usr1002");
-            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
-            //ShowCurrentDirectory();
+            Console.WriteLine(ReadFile("2.cpp"));
+            WriteFile("2.cpp", "#include<iostream>\nusing namespace std;\nint main()\n{\nreturn 0;\n}\n");
+            Console.WriteLine(ReadFile("2.cpp"));
+            
+        //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+        //ForwardtoADirectory("../..");
+        //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+        //ShowCurrentDirectory();
+        //ForwardtoADirectory("usr1002");
+        //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+        //ShowCurrentDirectory();
 
             //Console.WriteLine(list.Count());
 
