@@ -599,9 +599,9 @@ namespace FileSysConsole
             //重置超级块
             SuperBlock sb = new SuperBlock();
             //创建root文件夹
-            DiskiNode root_inode = new DiskiNode(0, "root", 0, author1){fore_addr = 0, type = ItemType.FOLDER };
+            DiskiNode root_inode = new DiskiNode(0, "root", 0, author1) { fore_addr = 0, type = ItemType.FOLDER, t_create = DateTime.Now, t_revise = DateTime.Now };
             //创建回收站
-            DiskiNode recycle_inode = new DiskiNode(1, "recyclebin", 0, author1) { fore_addr = 0,type=ItemType.FOLDER };
+            DiskiNode recycle_inode = new DiskiNode(1, "recyclebin", 0, author1) { fore_addr = 0,type=ItemType.FOLDER, t_create = DateTime.Now, t_revise = DateTime.Now };
             Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
             //把root和回收站添加到i节点列表里
             iNodeTT ins_tt = new iNodeTT();
@@ -614,19 +614,19 @@ namespace FileSysConsole
             //初始化用户文件夹
             Dictionary<uint, uint> author2 = new Dictionary<uint, uint>();
             author2.Add(1001, 7); author2.Add(0, 7);
-            DiskiNode usr1 = new DiskiNode(2, "usr1001", 0, author2) { type = ItemType.FOLDER };
+            DiskiNode usr1 = new DiskiNode(2, "usr1001", 0, author2) { type = ItemType.FOLDER, t_create = DateTime.Now, t_revise = DateTime.Now };
             ins_tt.tt[2] = new iNodeTable();
             ins_tt.tt[2].di_table.Add(usr1);
 
             Dictionary<uint, uint> author3 = new Dictionary<uint, uint>();
             author3.Add(1002, 7); author3.Add(0, 7);
-            DiskiNode usr2 = new DiskiNode(3, "usr1002", 0, author3) { type = ItemType.FOLDER };
+            DiskiNode usr2 = new DiskiNode(3, "usr1002", 0, author3) { type = ItemType.FOLDER, t_create = DateTime.Now, t_revise = DateTime.Now };
             ins_tt.tt[3] = new iNodeTable();
             ins_tt.tt[3].di_table.Add(usr2);
 
             Dictionary<uint, uint> author4 = new Dictionary<uint, uint>();
             author4.Add(2001, 7); author4.Add(0, 7);
-            DiskiNode usr3 = new DiskiNode(4, "usr2001", 0, author4) { type = ItemType.FOLDER };
+            DiskiNode usr3 = new DiskiNode(4, "usr2001", 0, author4) { type = ItemType.FOLDER, t_create = DateTime.Now, t_revise = DateTime.Now };
             ins_tt.tt[4] = new iNodeTable();
             ins_tt.tt[4].di_table.Add(usr3);
             root_inode.next_addr.Add(usr1.id);
@@ -1330,7 +1330,7 @@ namespace FileSysConsole
                 foreach(DiskiNode item in reslist)
                 {
                     //排除无权限访问的文件
-                    if (!new uint[] { 5, 7 }.Contains(item.uid[sys_current_user.uid]))
+                    if (!new uint[] { 5, 7 }.Contains(GetiNode(item.id).uid[sys_current_user.uid]))
                         reslist.Remove(item);
                 }
             }
@@ -1601,26 +1601,26 @@ namespace FileSysConsole
         /// </summary>
         public void exeall()
         {
-            //bool isInstall = false;
-            //if (!File.Exists("filesystem"))
-            //{
-            //    //安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
-            //    isInstall = Install();
-            //    if (!isInstall)
-            //    {
-            //        Console.WriteLine("File system installation failed");
-            //        return;
-            //    }
-            //}
-            //bool isStart = Start();//启动文件系统
-            //if (!isStart) return;
-            //InitializationForTest();//批处理，创建一些文件和文件夹!!!首次运行时需要，之后注释掉!!!
+            bool isInstall = false;
+            if (!File.Exists("filesystem"))
+            {
+                //安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
+                isInstall = Install();
+                if (!isInstall)
+                {
+                    Console.WriteLine("File system installation failed");
+                    return;
+                }
+            }
+            bool isStart = Start();//启动文件系统
+            if (!isStart) return;
+            InitializationForTest();//批处理，创建一些文件和文件夹!!!首次运行时需要，之后注释掉!!!
 
             //CopyFolder("usr2001", "usr1001");
             //ChangeCurrentDirectory("usr1001");
             //ShowDirectory();
-            uint[] test = GetSubAuthority(7);
-            Console.WriteLine(test.Count());
+            CreateIndexForSearch();
+            SearchInAllDisk("usr2001");
 
             //Console.WriteLine(new uint[] { 2, 3, 6, 7 }.Contains<uint>(3));
             //Console.WriteLine("-----------------");

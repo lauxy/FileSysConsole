@@ -71,7 +71,7 @@ namespace FileSysConsole
             //判断数据表是否存在
             if (Convert.ToInt32(checkcmd.ExecuteScalar()) == 0)
             {
-                string sql = "create table InodeTab (id integer primary key, name varchar(225), size real, uid integer, fore_addr integer, t_create text, t_revise text, type text)";
+                string sql = "create table InodeTab (id integer primary key, name varchar(225), size real, t_create text, t_revise text, type text)";
                 SQLiteCommand command = new SQLiteCommand(sql, m_dbConnection);
                 command.ExecuteNonQuery();
             }
