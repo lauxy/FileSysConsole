@@ -92,11 +92,12 @@ namespace FileSysTemp.FSBase
         public uint current_folder;                    //当前所在文件夹的i节点ID
         public List<uint> open_file = new List<uint>();//用户打开文件表
         public string newpassword;                     //用户新密码
-        public MemoryUser(uint uid, uint cf)
+        public MemoryUser(uint uid, uint cf, string pwd)
         {
             this.uid = uid;
             this.current_folder = cf;
             this.open_file.Add(cf);
+            this.newpassword = pwd;
         }
         /// <summary>
         /// 可供显式调用的析构函数

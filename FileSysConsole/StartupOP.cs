@@ -11,7 +11,7 @@ namespace FileSysConsole
 {
     public class Execute
     {
-        public MemoryUser sys_current_user = new MemoryUser(0, 0);//当前登录用户，登录写好要后修改current_user！！！！！！！！！TODO
+        public MemoryUser sys_current_user = null;//当前登录用户，登录写好要后修改current_user！！！！！！！！！TODO
         public SuperBlock sys_sb = new SuperBlock();//超级块
         public iNodeTT sys_inode_tt = new iNodeTT();
         const uint MAX_USERNUM = 10; //内存中允许的最大用户数（同时在线）
@@ -43,8 +43,12 @@ namespace FileSysConsole
         /// <param name="uid">用户id</param>
         /// <param name="password">用户密码</param>
         /// <returns>登录是否成功</returns>
-        public bool LoginSys(uint uid, string password)
+        public bool LoginSys()
         {
+            Console.Write("UserID: ");
+            uint uid = Convert.ToUInt32(Console.ReadLine());
+            Console.WriteLine("\nPassword: ");
+            string password = Console.ReadLine();
             List<User> users = LoadUsersInfofromDisk();
             bool isExist = false;
             User curUser = new User();
@@ -55,6 +59,7 @@ namespace FileSysConsole
                     isExist = true;
                     curUser.uid = user.uid;
                     curUser.password = user.password;
+                    curUser.current_folder = user.current_folder;
                     break;
                 }
             }
@@ -70,7 +75,8 @@ namespace FileSysConsole
                 if (cur_usernum < MAX_USERNUM)
                 {
                     //内存中同时在线用户数少于最大用户数限制，用户可以正常登录
-                    MemoryUser user = new MemoryUser(curUser.uid, curUser.current_folder);
+                    sys_current_user = new MemoryUser(curUser.uid, curUser.current_folder, curUser.password);
+                    cur_usernum++;
                 }
                 else
                 {
@@ -95,35 +101,67 @@ namespace FileSysConsole
         /// <returns>退出成功与否</returns>
         public bool LogoutSys()
         {
-            bool issucceed = StoreUserInfotoDisk(sys_current_user.uid, sys_current_user.current_folder);
-            sys_current_user.Destructor(); //释放资源
-            UpdateDiskSFi();
-            Console.WriteLine("You have been logout successfully!");
-            return issucceed;
+            try
+            {
+                UpdateDiskSFi();
+                sys_current_user.Destructor(); //释放资源
+                sys_current_user = null;
+                cur_usernum--;
+                Console.WriteLine("You have been logout successfully!");
+                return true;
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("Fail to logout! Exception Infomation: " + ex.Message);
+                return false;
+            }
         }
-        //用户登录，暂时为了测程序好测，这里要改！！！！！！！！TODO
-        public bool Login()
+
+        /// <summary>
+        /// 修改用户密码
+        /// </summary>
+        public bool RevisePassword()
         {
-            //TODO:用户登录模块，登录成功则修改current_user并返回true，否则返回false
-            return true;
+            string password, confirmpwd;
+            do
+            {
+                Console.WriteLine("New Password: ");
+                password = Console.ReadLine();
+                Console.WriteLine("Confirm Password: ");
+                confirmpwd = Console.ReadLine();
+                if (password != confirmpwd)
+                {
+                    Console.WriteLine("The passwords input are inconsistent, please re-enter!");
+                }
+            } while (password != confirmpwd);
+            if (sys_current_user == null)
+            {
+                Console.WriteLine("Please login your account first, and then change the password!");
+                return false;
+            }
+            sys_current_user.newpassword = password;
+            bool issuccess = StoreUserInfotoDisk(sys_current_user); //将更改写回磁盘
+            Console.WriteLine("Password has been reset successfully!");
+            return issuccess;
         }
+
         /// <summary>
         /// 将用户信息写回到磁盘
         /// </summary>
         /// <param name="uid"></param>
         /// <param name="curfolder"></param>
         /// <returns></returns>
-        public bool StoreUserInfotoDisk(uint uid, uint curfolder)
+        public bool StoreUserInfotoDisk(MemoryUser currentUser)
         {
             List<User> userlist = LoadUsersInfofromDisk();
             for(int i=0;i<userlist.Count();i++)
             {
-                if(uid==userlist[i].uid)
+                if(currentUser.uid==userlist[i].uid)
                 {
                     //修改当前用户的当前工作文件夹
-                    userlist[i].current_folder = curfolder;
+                    userlist[i].current_folder = currentUser.current_folder;
                     //更新密码
-                    userlist[i].password = sys_current_user.newpassword;
+                    userlist[i].password = currentUser.newpassword;
                     //写回磁盘
                     FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
                     BinaryFormatter binFormat = new BinaryFormatter();
@@ -155,7 +193,7 @@ namespace FileSysConsole
         public bool Start()
         {
             //1，登录
-            if (Login() == true)
+            if (LoginSys() == true)
             {
                 //2，读取必要块区到内存
                 FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
@@ -1283,7 +1321,7 @@ namespace FileSysConsole
             //dbop.LoadDataToDb(list);
             //dbop.printHighscores();
             //string str = Console.ReadLine();
-            dbop.ClearTableInDb();
+           
             //dbop.ExecuteUserCmd(str);
             //string sql = "create index index_{0} on InodeTab({0})";
             //sql = string.Format(sql, new string("id"));
