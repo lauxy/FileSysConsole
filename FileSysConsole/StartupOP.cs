@@ -1282,8 +1282,9 @@ namespace FileSysConsole
             //}
             //dbop.LoadDataToDb(list);
             //dbop.printHighscores();
-            string str = Console.ReadLine();
-            dbop.ExecuteUserCmd(str);
+            //string str = Console.ReadLine();
+            dbop.ClearTableInDb();
+            //dbop.ExecuteUserCmd(str);
             //string sql = "create index index_{0} on InodeTab({0})";
             //sql = string.Format(sql, new string("id"));
             //Console.WriteLine(sql);

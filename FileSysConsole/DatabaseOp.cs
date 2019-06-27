@@ -171,6 +171,13 @@ namespace FileSysConsole
         /// </summary>
         public bool CreateIndex(string indexType)
         {
+            string checkTableExist = "select count(*) from sqlite_master where type='table' and name='InodeTab'";
+            SQLiteCommand checkcmd = new SQLiteCommand(checkTableExist, m_dbConnection);
+            //判断数据表是否存在
+            if (Convert.ToInt32(checkcmd.ExecuteScalar()) > 0)
+            {
+                ClearTableInDb();  //先确保清空数据表
+            }
             string sql = "create index index_{0} on InodeTab({0})";
             SQLiteCommand cmd = m_dbConnection.CreateCommand();
             string[] legelindex = { "id", "name", "uid", "fore_addr", "t_create", "t_revise", "type" };
@@ -201,6 +208,26 @@ namespace FileSysConsole
                 return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// 清楚数据库中的数据及建立的索引
+        /// </summary>
+        private bool ClearTableInDb()
+        {
+            string clrtab = "drop table InodeTab";
+            SQLiteCommand cmd = m_dbConnection.CreateCommand();
+            try
+            {
+                cmd.CommandText = clrtab;
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
         }
     }
 }
