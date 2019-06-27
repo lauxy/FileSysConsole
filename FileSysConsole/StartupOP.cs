@@ -6,8 +6,6 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace FileSysConsole
 {
@@ -22,7 +20,7 @@ namespace FileSysConsole
         /// 回收站文件地址映射（用于还原）List<Dictionary<inode_id, fore_addr_id>>
         /// </summary>
         Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
-
+        
         /// <summary>
         /// 输出所有i节点表
         /// </summary>
@@ -776,7 +774,6 @@ namespace FileSysConsole
                 FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
                 for (int i=0;i<read_dn.size;i++)
                 {
-                    //Console.WriteLine(read_dn.next_addr[i]);
                     byte[] byData = new byte[1024];
                     fs.Position = read_dn.next_addr[i];
                     fs.Read(byData, 0, byData.Length);
@@ -801,7 +798,7 @@ namespace FileSysConsole
             int num = (file_content.Length / (int)SuperBlock.BLOCK_SIZE) + 1;
             //Console.WriteLine("num:" + num.ToString());
             //Console.WriteLine("len:" + len.ToString());
-            //Console.WriteLine("addr:"+wdn.next_addr[0]);
+            Console.WriteLine("addr"+wdn.next_addr[0]);
             //若写入字节大于原有磁盘块，分配新盘快
             if (num > len) { for (int i = 0; i < num - len;wdn.next_addr.Add(AllocADiskBlock()), i++) ; }
             //若写入字节小于原有磁盘块，回收旧盘块
@@ -1232,26 +1229,26 @@ namespace FileSysConsole
         public void exeall()
         {
             //Install();//安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
-            Start();//启动文件系统
+            //  Start();//启动文件系统
             //InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
 
-            
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root:");
-            ShowFile("/");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr1001:");
-            ShowFile("/usr1001");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr1001/Software:");
-            ShowFile("/usr1001/Software");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr1002:");
-            ShowFile("/usr1002");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr2001:");
-            ShowFile("/usr2001");
-            Console.WriteLine("-----------------");
+
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root:");
+            //ShowFile("/");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr1001:");
+            //ShowFile("/usr1001");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr1001/Software:");
+            //ShowFile("/usr1001/Software");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr1002:");
+            //ShowFile("/usr1002");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr2001:");
+            //ShowFile("/usr2001");
+            //Console.WriteLine("-----------------");
 
 
             //DirectOp op = new DirectOp();
@@ -1261,22 +1258,36 @@ namespace FileSysConsole
 
 
             //CopyFile("usr2001/2.cpp", "usr1001/Software");
-            ChangeCurrentDirectory("usr1001/Software");
-            ShowCurrentDirectory();
-            Console.WriteLine(ReadFile("2.cpp"));
-            WriteFile("2.cpp", "#include<iostream>\nusing namespace std;\nint main()\n{\nreturn 0;\n}\n");
-            Console.WriteLine(ReadFile("2.cpp"));
-            
-        //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
-        //ForwardtoADirectory("../..");
-        //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
-        //ShowCurrentDirectory();
-        //ForwardtoADirectory("usr1002");
-        //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
-        //ShowCurrentDirectory();
+            //ChangeCurrentDirectory("usr1001");
+            //ShowCurrentDirectory();
+
+
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+            //ForwardtoADirectory("../..");
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+            //ShowCurrentDirectory();
+            //ForwardtoADirectory("usr1002");
+            //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
+            //ShowCurrentDirectory();
 
             //Console.WriteLine(list.Count());
 
+            DatabaseOp dbop = new DatabaseOp();
+
+            //List<DiskiNode> list = new List<DiskiNode>();
+            //for (int i = 1; i <= 5; i++)
+            //{
+            //    DiskiNode inode = new DiskiNode(Convert.ToUInt32(i), "test" + i.ToString() + ".txt", Convert.ToUInt32(1000 + i), Convert.ToUInt32(i + 1));
+            //    list.Add(inode);
+            //}
+            //dbop.LoadDataToDb(list);
+            //dbop.printHighscores();
+            string str = Console.ReadLine();
+            dbop.ExecuteUserCmd(str);
+            //string sql = "create index index_{0} on InodeTab({0})";
+            //sql = string.Format(sql, new string("id"));
+            //Console.WriteLine(sql);
+            //dbop.CreateIndex("id");
         }
     }
 }
