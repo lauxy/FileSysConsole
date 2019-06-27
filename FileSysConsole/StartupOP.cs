@@ -20,7 +20,7 @@ namespace FileSysConsole
         /// 回收站文件地址映射（用于还原）List<Dictionary<inode_id, fore_addr_id>>
         /// </summary>
         Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
-
+        
         /// <summary>
         /// 输出所有i节点表
         /// </summary>
@@ -1229,26 +1229,26 @@ namespace FileSysConsole
         public void exeall()
         {
             //Install();//安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
-            Start();//启动文件系统
+            //  Start();//启动文件系统
             //InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
 
-            
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root:");
-            ShowFile("/");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr1001:");
-            ShowFile("/usr1001");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr1001/Software:");
-            ShowFile("/usr1001/Software");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr1002:");
-            ShowFile("/usr1002");
-            Console.WriteLine("-----------------");
-            Console.WriteLine("root/usr2001:");
-            ShowFile("/usr2001");
-            Console.WriteLine("-----------------");
+
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root:");
+            //ShowFile("/");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr1001:");
+            //ShowFile("/usr1001");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr1001/Software:");
+            //ShowFile("/usr1001/Software");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr1002:");
+            //ShowFile("/usr1002");
+            //Console.WriteLine("-----------------");
+            //Console.WriteLine("root/usr2001:");
+            //ShowFile("/usr2001");
+            //Console.WriteLine("-----------------");
 
 
             //DirectOp op = new DirectOp();
@@ -1258,8 +1258,8 @@ namespace FileSysConsole
 
 
             //CopyFile("usr2001/2.cpp", "usr1001/Software");
-            ChangeCurrentDirectory("usr1001");
-            ShowCurrentDirectory();
+            //ChangeCurrentDirectory("usr1001");
+            //ShowCurrentDirectory();
 
 
             //Console.WriteLine("CurFolder: " + GetiNode(sys_current_user.current_folder).name);
@@ -1272,6 +1272,22 @@ namespace FileSysConsole
 
             //Console.WriteLine(list.Count());
 
+            DatabaseOp dbop = new DatabaseOp();
+
+            //List<DiskiNode> list = new List<DiskiNode>();
+            //for (int i = 1; i <= 5; i++)
+            //{
+            //    DiskiNode inode = new DiskiNode(Convert.ToUInt32(i), "test" + i.ToString() + ".txt", Convert.ToUInt32(1000 + i), Convert.ToUInt32(i + 1));
+            //    list.Add(inode);
+            //}
+            //dbop.LoadDataToDb(list);
+            //dbop.printHighscores();
+            string str = Console.ReadLine();
+            dbop.ExecuteUserCmd(str);
+            //string sql = "create index index_{0} on InodeTab({0})";
+            //sql = string.Format(sql, new string("id"));
+            //Console.WriteLine(sql);
+            //dbop.CreateIndex("id");
         }
     }
 }
