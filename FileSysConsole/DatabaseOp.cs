@@ -178,7 +178,8 @@ namespace FileSysConsole
             {
                 ClearTableInDb();  //先确保清空数据表
             }
-            string sql = "create index index_{0} on InodeTab({0})";
+            else CreateTable();
+            string sql = "create index if not exists index_{0} on InodeTab({0})";
             SQLiteCommand cmd = m_dbConnection.CreateCommand();
             string[] legelindex = { "id", "name", "uid", "fore_addr", "t_create", "t_revise", "type" };
             bool islegel = false;
@@ -215,11 +216,11 @@ namespace FileSysConsole
         /// </summary>
         private bool ClearTableInDb()
         {
-            string clrtab = "drop table InodeTab";
+            string clrdat = "delete from InodeTab";
             SQLiteCommand cmd = m_dbConnection.CreateCommand();
             try
             {
-                cmd.CommandText = clrtab;
+                cmd.CommandText = clrdat;
                 cmd.ExecuteNonQuery();
                 return true;
             }
@@ -227,6 +228,36 @@ namespace FileSysConsole
             {
                 Console.WriteLine(ex.Message);
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// 从数据库中搜索一个文件
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns></returns>
+        public List<DiskiNode> SearchFileUsingDb(string filename)
+        {
+            string sql = "select * from InodeTab where name='" + filename + "'";
+            List<DiskiNode> reslist = new List<DiskiNode>();
+            try
+            {
+                SQLiteCommand cmd = m_dbConnection.CreateCommand();
+                cmd.CommandText = sql;
+                cmd.ExecuteNonQuery();
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    DiskiNode inode =
+                        new DiskiNode(Convert.ToUInt32(reader[0]), reader[1].ToString(), Convert.ToUInt32(reader[2]), Convert.ToUInt32(reader[3]), Convert.ToUInt32(reader[4]), Convert.ToDateTime(reader[5]), Convert.ToDateTime(reader[6]), reader[7].ToString() == "FILE" ? ItemType.FILE : ItemType.FOLDER);
+                    reslist.Add(inode);
+                }
+                return reslist;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return reslist;
             }
         }
     }

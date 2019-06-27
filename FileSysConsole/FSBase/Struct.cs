@@ -61,6 +61,19 @@ namespace FileSysTemp.FSBase
             this.size = size;
             this.uid = uid;
         }
+
+        public DiskiNode(uint id, string name, uint size, uint uid, uint fore_addr, DateTime t_create, DateTime t_revise, ItemType type)
+        {
+            this.id = id;
+            this.name = name;
+            this.size = size;
+            this.uid = uid;
+            this.fore_addr = fore_addr;
+            this.t_create = t_create;
+            this.t_revise = t_revise;
+            this.type = type;
+        }
+
         public DiskiNode() { }
     }
 
