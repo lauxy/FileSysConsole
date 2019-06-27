@@ -108,7 +108,7 @@ namespace FileSysConsole
                         foreach (DiskiNode inode in inodelist)
                         {
                             string sql =
-                                string.Format("insert into InodeTab values ({0},'{1}',{2},{3},{4},'{5}','{6}','{7}')", inode.id, inode.name, inode.size, inode.uid, inode.fore_addr, inode.t_create, inode.t_revise, inode.type);
+                                string.Format("insert into InodeTab values ({0},'{1}',{2},'{3}','{4}','{5}')", inode.id, inode.name, inode.size, inode.t_create, inode.t_revise, inode.type);
                             cmd.CommandText = sql;
                             cmd.ExecuteNonQuery();
                         }
@@ -181,7 +181,7 @@ namespace FileSysConsole
             else CreateTable();
             string sql = "create index if not exists index_{0} on InodeTab({0})";
             SQLiteCommand cmd = m_dbConnection.CreateCommand();
-            string[] legelindex = { "id", "name", "uid", "fore_addr", "t_create", "t_revise", "type" };
+            string[] legelindex = { "id", "name", "size", "t_create", "t_revise", "type" };
             bool islegel = false;
             foreach (string item in legelindex)
             {
@@ -249,7 +249,7 @@ namespace FileSysConsole
                 while (reader.Read())
                 {
                     DiskiNode inode =
-                        new DiskiNode(Convert.ToUInt32(reader[0]), reader[1].ToString(), Convert.ToUInt32(reader[2]), Convert.ToUInt32(reader[3]), Convert.ToUInt32(reader[4]), Convert.ToDateTime(reader[5]), Convert.ToDateTime(reader[6]), reader[7].ToString() == "FILE" ? ItemType.FILE : ItemType.FOLDER);
+                        new DiskiNode(Convert.ToUInt32(reader[0]), reader[1].ToString(), Convert.ToUInt32(reader[2]), Convert.ToDateTime(reader[3]), Convert.ToDateTime(reader[4]), reader[5].ToString() == "FILE" ? ItemType.FILE : ItemType.FOLDER);
                     reslist.Add(inode);
                 }
                 return reslist;

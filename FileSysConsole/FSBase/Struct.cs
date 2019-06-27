@@ -47,28 +47,42 @@ namespace FileSysTemp.FSBase
         public uint id;                                //磁盘i节点ID
         public string name;                            //文件(夹)名
         public uint size;                              //文件(夹)大小
-        public uint uid;                               //用户ID，1~1000用户组1，2~2000用户组2...
+        public Dictionary<uint, uint> uid;               //用户ID，1~1000用户组1，2~2000用户组2...(uid,priority)
         public List<uint> next_addr = new List<uint>();//文件的磁盘块地址或者文件夹下的文件(夹)的i节点ID
         public uint fore_addr;                         //上层目录的i的ID
         public DateTime t_create;                      //文件(夹)创建时间
         public DateTime t_revise;                      //文件(夹)修改时间
         public ItemType type;                          //类型：文件/文件夹
 
-        public DiskiNode(uint id, string name, uint size, uint uid)
+        public DiskiNode(uint id, string name, uint size)
         {
             this.id = id;
             this.name = name;
             this.size = size;
-            this.uid = uid;
+        }
+        public DiskiNode(uint id, string name, uint size, Dictionary<uint,uint> authority)
+        {
+            this.id = id;
+            this.name = name;
+            this.size = size;
+            this.uid = authority;
         }
 
-        public DiskiNode(uint id, string name, uint size, uint uid, uint fore_addr, DateTime t_create, DateTime t_revise, ItemType type)
+        /// <summary>
+        /// 数据库专用（构造函数）
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="name"></param>
+        /// <param name="size"></param>
+        /// <param name="fore_addr"></param>
+        /// <param name="t_create"></param>
+        /// <param name="t_revise"></param>
+        /// <param name="type"></param>
+        public DiskiNode(uint id, string name, uint size, DateTime t_create, DateTime t_revise, ItemType type)
         {
             this.id = id;
             this.name = name;
             this.size = size;
-            this.uid = uid;
-            this.fore_addr = fore_addr;
             this.t_create = t_create;
             this.t_revise = t_revise;
             this.type = type;

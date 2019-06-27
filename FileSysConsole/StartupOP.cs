@@ -299,7 +299,7 @@ namespace FileSysConsole
         public DiskiNode GetiNode(uint id)
         {
             uint temp_id = id % 128;
-            DiskiNode dn = new DiskiNode(0,".",0,0);
+            DiskiNode dn = new DiskiNode(0,".",0);
             iNodeTable it = sys_inode_tt.tt[temp_id];
             for (int i = 0; i < it.di_table.Count(); i++)
             {
@@ -338,7 +338,7 @@ namespace FileSysConsole
             uint temp_id = sys_current_user.current_folder;
             List<DiskiNode> dn_head = new List<DiskiNode>();
             List<DiskiNode> dn_tail = new List<DiskiNode>();
-            DiskiNode err_dn = new DiskiNode(0, ".", 0, 0);
+            DiskiNode err_dn = new DiskiNode(0, ".", 0);
             string[] paths0;
             List<string> paths = new List<string>();
             //若为绝对路径
@@ -452,7 +452,7 @@ namespace FileSysConsole
             return false;
         }
         /// <summary>
-        /// 创建文件(夹)：分配i节点
+        /// 创建文件(夹)：分配i节点, 创建文件者拥有文件的全部权限！！
         /// </summary>
         /// <param name="type"></param>
         /// <param name="fname"></param>
@@ -473,24 +473,26 @@ namespace FileSysConsole
                 //Console.WriteLine(newpath);
                 List<DiskiNode> fold_node_tmp = GetiNodeByPath(newpath);
                 //Console.WriteLine(fold_node_tmp.Count());
-                if (fold_node_tmp.Count > 1) { return new DiskiNode(0, ".", 0, 0); }
+                if (fold_node_tmp.Count > 1) { return new DiskiNode(0, ".", 0); }
                 else
                 {
                     fold_node = fold_node_tmp[0];
                 }
-                if (fold_node.name == ".") return fold_node;
+                if (fold_node.name == ".") return fold_node; 
             }
             if (IsNameConflict(fold_node, fname, type)) //出现同名冲突
             {
                 Console.WriteLine("Name Conflict!");
-                return new DiskiNode(0, ".", 0, 0);
+                return new DiskiNode(0, ".", 0);
             }
             //2,分配i节点,分配磁盘块,上级i节点更新,写回磁盘
             uint id = AllocAiNodeID();
             DiskiNode ndn;
+            Dictionary<uint, uint> author = new Dictionary<uint, uint>();
+            author.Add(sys_current_user.uid, 7);
             if (type == ItemType.FOLDER)
             {
-                ndn = new DiskiNode(id, fname, 0, sys_current_user.uid)
+                ndn = new DiskiNode(id, fname, 0, author)
                 {
                     type = ItemType.FOLDER
                 };
@@ -498,12 +500,13 @@ namespace FileSysConsole
             else
             {
                 uint block_addr = AllocADiskBlock();
-                ndn = new DiskiNode(id, fname, 1, sys_current_user.uid)
+                ndn = new DiskiNode(id, fname, 1, author)
                 {
                     type = ItemType.FILE
                 };
                 ndn.next_addr.Add(block_addr);
             }
+            author.Clear();
             ndn.fore_addr = fold_node.id;
             fold_node.next_addr.Add(id);
             if (sys_inode_tt.tt[id % 128] == null)
@@ -588,13 +591,15 @@ namespace FileSysConsole
         {
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             BinaryFormatter binFormat = new BinaryFormatter();
+            Dictionary<uint, uint> author = new Dictionary<uint, uint>();
+            author.Add(0, 7); //uid零号超级管理员对root具有全部权限
             //若是超级管理员格式化磁盘
             //重置超级块
             SuperBlock sb = new SuperBlock();
             //创建root文件夹
-            DiskiNode root_inode = new DiskiNode(0, "root", 0, 0){fore_addr = 0, type = ItemType.FOLDER };
+            DiskiNode root_inode = new DiskiNode(0, "root", 0, author){fore_addr = 0, type = ItemType.FOLDER };
             //创建回收站
-            DiskiNode recycle_inode = new DiskiNode(1, "recyclebin", 0, 0) { fore_addr = 0,type=ItemType.FOLDER };
+            DiskiNode recycle_inode = new DiskiNode(1, "recyclebin", 0, author) { fore_addr = 0,type=ItemType.FOLDER };
             Dictionary<uint, uint> recyclebinMap = new Dictionary<uint, uint>();
             //把root和回收站添加到i节点列表里
             iNodeTT ins_tt = new iNodeTT();
@@ -603,19 +608,26 @@ namespace FileSysConsole
             ins_tt.tt[1] = new iNodeTable();
             ins_tt.tt[1].di_table.Add(recycle_inode);
             root_inode.next_addr.Add(recycle_inode.id);
+            author.Clear();
             //初始化用户文件夹
-            DiskiNode usr1 = new DiskiNode(2, "usr1001", 0, 1001) { type = ItemType.FOLDER };
+            author.Add(1001, 7);
+            DiskiNode usr1 = new DiskiNode(2, "usr1001", 0, author) { type = ItemType.FOLDER };
             ins_tt.tt[2] = new iNodeTable();
             ins_tt.tt[2].di_table.Add(usr1);
-            DiskiNode usr2 = new DiskiNode(3, "usr1002", 0, 1002) { type = ItemType.FOLDER };
+            author.Clear();
+            author.Add(1002, 7);
+            DiskiNode usr2 = new DiskiNode(3, "usr1002", 0, author) { type = ItemType.FOLDER };
             ins_tt.tt[3] = new iNodeTable();
             ins_tt.tt[3].di_table.Add(usr2);
-            DiskiNode usr3 = new DiskiNode(4, "usr2001", 0, 2001) { type = ItemType.FOLDER };
+            author.Clear();
+            author.Add(2001, 7);
+            DiskiNode usr3 = new DiskiNode(4, "usr2001", 0, author) { type = ItemType.FOLDER };
             ins_tt.tt[4] = new iNodeTable();
             ins_tt.tt[4].di_table.Add(usr3);
             root_inode.next_addr.Add(usr1.id);
             root_inode.next_addr.Add(usr2.id);
             root_inode.next_addr.Add(usr3.id);
+            author.Clear();
             //重置超级栈
             sb.last_group_addr = new List<uint>();
             for (uint i = 0; i < SuperBlock.BLOCK_IN_GROUP; i++) { sb.last_group_addr.Add((4000+i)* SuperBlock.BLOCK_SIZE); }
@@ -741,17 +753,31 @@ namespace FileSysConsole
         {
             DiskiNode temp_dn = GetiNodeByPath(path)[0];
             if (temp_dn.name == ".") { Console.WriteLine("No Such File."); return false; }
-            Console.WriteLine(temp_dn.id);
-            if (temp_dn.type == ItemType.FOLDER) { Console.WriteLine("This is a folder!"); return false; }
-            else if(temp_dn.type == ItemType.FILE)
+            if(new uint[]{ 2,3,6,7 }.Contains(temp_dn.uid[sys_current_user.uid]))
             {
-                RecycleiNode(temp_dn.id);
-                Console.WriteLine("Successfully to Delete File.");
-                //OutputTT();
+                //当前用户有w权限，可以删除文件
+                Console.WriteLine(temp_dn.id);
+                if (temp_dn.type == ItemType.FOLDER) {
+                    //该函数不能删除文件夹，需要调用专门的函数DeleteFolder
+                    Console.WriteLine("This is a folder!");
+                }
+                else
+                {
+                    //是文件，可以删除
+                    RecycleiNode(temp_dn.id);
+                    Console.WriteLine("Successfully to Delete File.");
+                    //OutputTT();
+                }
                 return true;
             }
-            return false;
+            else
+            {
+                //当前用户没有写权限，不能删除文件
+                Console.WriteLine("Have no sufficient permissions to delete this file!");
+                return false;
+            }
         }
+
         /// <summary>
         /// 递归删除一个文件夹
         /// </summary>
@@ -989,7 +1015,23 @@ namespace FileSysConsole
         public bool CopyFile(string filename, string tarpath)
         {
             List<DiskiNode> from = GetiNodeByPath(filename);
+            foreach (DiskiNode file in from)
+            {
+                //判断当前用户对源文件是否有移动权限
+                if (!new uint[] { 4, 5, 6, 7 }.Contains(file.uid[sys_current_user.uid]))
+                {
+                    from.Remove(file); //将没有移动权限的文件从移动文件列表中移除
+                    Console.WriteLine("You have no permissions to copy " + file.name);
+                }
+            }
+            if (from.Count() == 0) return false; //没有可移动的文件
             DiskiNode to = GetiNodeByPath(tarpath).First();
+            if(!new uint[] { 2,3,6,7 }.Contains(to.uid[sys_current_user.uid]))
+            {
+                //没有足够的权限修改目的文件夹
+                Console.WriteLine("You do not have sufficient permissions to copy files to " + to.name);
+                return false;
+            }
             foreach (DiskiNode inode in from)
             {
                 bool collision = false;
@@ -1007,7 +1049,7 @@ namespace FileSysConsole
                 }
                 if (collision == true) continue;
                 if (inode.type == ItemType.FOLDER) return false; //排除文件夹
-                DiskiNode newiNode = new DiskiNode(AllocAiNodeID(), inode.name, inode.size, sys_current_user.uid)
+                DiskiNode newiNode = new DiskiNode(AllocAiNodeID(), inode.name, inode.size, inode.uid)
                 {
                     fore_addr = to.id
                 };
@@ -1027,15 +1069,31 @@ namespace FileSysConsole
             return true;
         }
         /// <summary>
-        /// 移动一个文件filename或文件夹到另一个目录下tarpath
+        /// 移动一个文件filename或文件夹到另一个目录下tarpath()
         /// </summary>
         /// <param name="filename">文件(夹)名(当前目录下的文件)或带相对路径的文件</param>
         /// <param name="tarpath">移动到的目的地址</param>
-        public void Move(string filename, string tarpath)
+        public bool Move(string filename, string tarpath)
         {
             //若为模糊输入，返回所有匹配结果的i结点
             List<DiskiNode> fromlist = GetiNodeByPath(filename);
+            foreach (DiskiNode file in fromlist)
+            {
+                //判断当前用户对源文件是否有移动权限
+                if (!new uint[] { 2, 3, 6, 7 }.Contains(file.uid[sys_current_user.uid]))
+                {
+                    fromlist.Remove(file); //将没有移动权限的文件从移动文件列表中移除
+                    Console.WriteLine("You have no permissions to move " + file.name);
+                }
+            }
+            if (fromlist.Count() == 0) return false; //没有可移动的文件
             DiskiNode to = GetiNodeByPath(tarpath).First();
+            if (!new uint[] { 2, 3, 6, 7 }.Contains(to.uid[sys_current_user.uid]))
+            {
+                //没有足够的权限修改目的文件夹
+                Console.WriteLine("You do not have sufficient permissions to move files to " + to.name);
+                return false;
+            }
             foreach (DiskiNode inode in fromlist)
             {
                 //把原地址上一级（父级）i结点中存的下一级信息中有关该节点的id删除
@@ -1054,12 +1112,13 @@ namespace FileSysConsole
                 to.next_addr.Add(inode.id);
             }
             UpdateDiskSFi(false, true); //将变更写回磁盘
+            return true;
         }
         /// <summary>
         /// 进入某一文件夹
         /// </summary>
         /// <param name="foldername"></param>
-        public void ChangeCurrentDirectory(string foldername)
+        public bool ChangeCurrentDirectory(string foldername)
         {
             List<DiskiNode> inode = GetiNodeByPath(foldername);
             if (inode.Count() > 1)
@@ -1067,22 +1126,42 @@ namespace FileSysConsole
                 if(!(inode.Count()==2 && inode[0].name == inode[1].name))
                 {
                     Console.WriteLine("cd: too many arguments");
-                    return;
+                    return false;
                 }
             }
             if (inode[0].type == ItemType.FILE)
             {
                 Console.WriteLine("This is a FILE.");
+                return false;
             }
-            else sys_current_user.current_folder = inode.First().id;
+            else
+            {
+                if(!new uint[] { 1,3,5,7 }.Contains(inode.First().uid[sys_current_user.uid]))
+                {
+                    Console.WriteLine("You do not have sufficient permissions to step in this folder!");
+                    return false;
+                }
+                sys_current_user.current_folder = inode.First().id;
+            }
+            return true;
         }
         /// <summary>
         /// 将一个文件移入回收站
         /// </summary>
         /// <param name="path">文件的路径</param>
-        public void MoveToRecycleBin(string path)
+        public bool MoveToRecycleBin(string path)
         {
             List<DiskiNode> delitem = GetiNodeByPath(path);
+            foreach(DiskiNode file in delitem)
+            {
+                if (!new uint[] { 2, 3, 6, 7 }.Contains(file.uid[sys_current_user.uid]))
+                {
+                    delitem.Remove(file);
+                    Console.WriteLine("You do not have permissions to delete " + file.name);
+                    return false;
+                }
+            }
+            if (delitem.Count() == 0) return false;
             DiskiNode recyclebin = GetiNode(1);   //获取回收站i结点
             foreach (DiskiNode item in delitem)
             {
@@ -1091,6 +1170,7 @@ namespace FileSysConsole
                 item.fore_addr = 1;
                 recyclebin.next_addr.Add(item.id);
             }
+            return true;
         }
 
         /// <summary>
@@ -1110,8 +1190,18 @@ namespace FileSysConsole
                 for (int i = 0; i < restore.Count(); i++)
                 {
                     DiskiNode inode = GetiNode(restore[i]);
+                    if (!new uint[] { 2, 3, 6, 7 }.Contains(inode.uid[sys_current_user.uid]))
+                    {
+                        restore.Remove(inode.id);
+                        continue;
+                    }
                     Console.WriteLine("id: " + inode.id + ", name: " + inode.name + ", type: " + inode.type +
                         ", size: " + inode.size + ", revise time: " + inode.t_revise);
+                }
+                if (restore.Count() == 0)
+                {
+                    Console.WriteLine("File or Directory does not exists!");
+                    return new DiskiNode(0, ".", 0); //没有可以还原的文件
                 }
                 Console.Write("Please select a file or folder to restore: ");
                 uint id = Convert.ToUInt32(Console.ReadLine());
@@ -1122,7 +1212,7 @@ namespace FileSysConsole
                 if (tmpid.Count() == 0)
                 {
                     Console.WriteLine("File or Directory does not exists!");
-                    return new DiskiNode(0, ".", 0, 0);
+                    return new DiskiNode(0, ".", 0);
                 }
                 removeid = id;
             }
@@ -1142,7 +1232,8 @@ namespace FileSysConsole
             foreach (uint id in recyclebin.next_addr)
             {
                 DiskiNode inode = GetiNode(id);
-                Console.WriteLine("name: " + inode.name + ", type: " + inode.type +
+                if (new uint[] { 2, 3, 6, 7 }.Contains(inode.uid[sys_current_user.uid]))
+                    Console.WriteLine("name: " + inode.name + ", type: " + inode.type +
                         ", size: " + inode.size + ", revise time: " + inode.t_revise);
             }
         }
@@ -1156,7 +1247,8 @@ namespace FileSysConsole
             foreach (uint item in recyclebin.next_addr)
             {
                 DiskiNode inode = GetiNode(item);
-                DeleteAFolder(inode);
+                if (new uint[] { 2, 3, 6, 7 }.Contains(inode.uid[sys_current_user.uid]))
+                    DeleteAFolder(inode);
             }
         }
 
@@ -1209,7 +1301,7 @@ namespace FileSysConsole
             {
                 Stack<DiskiNode> stack = new Stack<DiskiNode>();
                 stack.Push(GetiNode(0));
-                while (stack.Count != 0)
+                while (stack.Count() != 0)
                 {
                     DiskiNode visit = stack.Peek();
                     stack.Pop();
@@ -1220,7 +1312,9 @@ namespace FileSysConsole
                     }
                     for (int i = visit.next_addr.Count() - 1; i >= 0; i--)
                     {
-                        stack.Push(GetiNode(visit.next_addr[i]));
+                        DiskiNode inode = GetiNode(visit.next_addr[i]);
+                        if(new uint[] { 5,7 }.Contains(inode.uid[sys_current_user.uid]))
+                            stack.Push(GetiNode(visit.next_addr[i]));
                     }
                 }
             }
@@ -1229,6 +1323,12 @@ namespace FileSysConsole
                 //已建立索引，使用数据库进行查询
                 DatabaseOp dbHandler = new DatabaseOp();
                 reslist = dbHandler.SearchFileUsingDb(filename);
+                foreach(DiskiNode item in reslist)
+                {
+                    //排除无权限访问的文件
+                    if (!new uint[] { 5, 7 }.Contains(item.uid[sys_current_user.uid]))
+                        reslist.Remove(item);
+                }
             }
             
             if (reslist.Count == 0)
@@ -1286,6 +1386,11 @@ namespace FileSysConsole
         public void ShowCurrentDirectory()
         {
             DiskiNode diriNode = GetiNode(sys_current_user.current_folder);
+            if(!new uint[] { 4,5,6,7 }.Contains(diriNode.uid[sys_current_user.uid]))
+            {
+                Console.WriteLine("You do not have sufficient permissions to view this folder!");
+                return;
+            }
             if (diriNode.next_addr.Count() == 0)
             {
                 Console.WriteLine("There is no file/folder.");
@@ -1310,22 +1415,22 @@ namespace FileSysConsole
         /// </summary>
         public void exeall()
         {
-            bool isInstall = false;
-            if (!File.Exists("filesystem"))
-            {
-                //安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
-                isInstall = Install();
-                if (!isInstall)
-                {
-                    Console.WriteLine("File system installation failed");
-                    return;
-                }
-            }
-            bool isStart = Start();//启动文件系统
-            if (!isStart) return;
+            //bool isInstall = false;
+            //if (!File.Exists("filesystem"))
+            //{
+            //    //安装文件系统，会创建root,回收站,usr1001,usr1002,usr2001.!!!仅在首次运行时需要!!!
+            //    isInstall = Install();
+            //    if (!isInstall)
+            //    {
+            //        Console.WriteLine("File system installation failed");
+            //        return;
+            //    }
+            //}
+            //bool isStart = Start();//启动文件系统
+            //if (!isStart) return;
             //InitializationForTest();//批处理，创建一些文件和文件夹.!!!首次运行时需要，之后注释掉!!!
 
-
+            Console.WriteLine(new uint[] { 2, 3, 6, 7 }.Contains<uint>(3));
             //Console.WriteLine("-----------------");
             //Console.WriteLine("root:");
             //ShowFile("/");
@@ -1342,8 +1447,8 @@ namespace FileSysConsole
             //Console.WriteLine("root/usr2001:");
             //ShowFile("/usr2001");
             //Console.WriteLine("-----------------");
-            CreateIndexForSearch();
-            SearchInAllDisk("usr1001");
+            //CreateIndexForSearch();
+            //SearchInAllDisk("usr1001");
             //DirectOp op = new DirectOp();
             //op.ShowCurrentDirectory();
             //Console.WriteLine("curFolder: " + GetiNode(sys_current_user.current_folder).name);
