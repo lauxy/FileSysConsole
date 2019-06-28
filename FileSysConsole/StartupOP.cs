@@ -154,9 +154,9 @@ namespace FileSysConsole
             string password, confirmpwd;
             do
             {
-                Console.WriteLine("New Password: ");
+                Console.Write("New Password: ");
                 password = Console.ReadLine();
-                Console.WriteLine("Confirm Password: ");
+                Console.Write("Confirm Password: ");
                 confirmpwd = Console.ReadLine();
                 if (password != confirmpwd)
                 {
@@ -595,6 +595,9 @@ namespace FileSysConsole
             BinaryFormatter binFormat = new BinaryFormatter();
             Dictionary<uint, uint> author1 = new Dictionary<uint, uint>();
             author1.Add(0, 7); //uid零号超级管理员对root具有全部权限
+            author1.Add(1001, 7);
+            author1.Add(1002, 7);
+            author1.Add(2001, 7);
             //若是超级管理员格式化磁盘
             //重置超级块
             SuperBlock sb = new SuperBlock();
@@ -637,7 +640,7 @@ namespace FileSysConsole
             sb.last_group_addr = new List<uint>();
             for (uint i = 0; i < SuperBlock.BLOCK_IN_GROUP; i++) { sb.last_group_addr.Add((4000+i)* SuperBlock.BLOCK_SIZE); }
             //组长块格式化，这里的32仅仅是前期为了快速建系统，之后要改成数据区组数，即4092*1024/128=32736
-            for (uint i = 0; i < 32; i++)
+            for (uint i = 0; i < 32736; i++)
             {
                 BlockLeader bl = new BlockLeader
                 {
@@ -670,12 +673,20 @@ namespace FileSysConsole
         public bool EraseBlock(uint block_order)
         {
             string str = "";
-            for (int i = 0; i < 1024; str += "\0", i++) ;
+            for (int i = 0; i < 1024; str += 'd', i++) ;
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             fs.Seek(block_order * 1024, SeekOrigin.Begin);
             byte[] byteArray = Encoding.Default.GetBytes(str);
-            fs.Write(byteArray, 0, byteArray.Length);
-            fs.Close();
+            try
+            {
+                fs.Write(byteArray, 0, byteArray.Length);
+                fs.Close();
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
             return true;
         }
         /// <summary>
@@ -869,13 +880,22 @@ namespace FileSysConsole
         public string ReadFile(string path)
         {
             DiskiNode read_dn = GetiNodeByPath(path)[0];
+            if(sys_current_user.open_file.Contains(read_dn.id))
+            {
+                Console.WriteLine("Someone has open " + read_dn.name);
+                return "";
+            }
+            if (!new uint[] { 4,5,6,7 }.Contains(read_dn.uid[sys_current_user.uid])){
+                Console.WriteLine("You do not have sufficient permissions to read " + read_dn.name);
+                return "";
+            }
             if (read_dn.name == ".") { Console.WriteLine("No Such File.");return ""; }
             string file_content = "";
             if (read_dn.type != ItemType.FILE) { return "This is a folder!"; }
             else
             {
                 FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                for (int i=0;i<read_dn.size;i++)
+                for (int i=0;i<read_dn.next_addr.Count;i++)
                 {
                     byte[] byData = new byte[1024];
                     fs.Position = read_dn.next_addr[i];
@@ -883,6 +903,7 @@ namespace FileSysConsole
                     file_content += System.Text.Encoding.Default.GetString(byData);
                 }
                 fs.Close();
+                sys_current_user.open_file.Remove(read_dn.id);
                 return file_content;
             }
         }
@@ -892,15 +913,29 @@ namespace FileSysConsole
         /// <param name="path"></param>
         /// <param name="file_content"></param>
         /// <returns></returns>
-        public bool WriteFile(string path, string file_content)
+        public bool WriteFile(string path)
         {
             DiskiNode wdn = GetiNodeByPath(path)[0];
+            if (!new uint[] { 2, 3, 6, 7 }.Contains(wdn.uid[sys_current_user.uid]))
+            {
+                Console.WriteLine("You do not have sufficient permissions to write in" + wdn.name);
+                return false;
+            }
+            if (sys_current_user.open_file.Contains(wdn.id))
+            {
+                Console.WriteLine("Someone has open " + wdn.name);
+                return false;
+            }
+            Console.WriteLine("Please input:");
+            string file_content = Console.ReadLine();
             if (wdn.name == ".") { Console.WriteLine("No Such File.");return false; }
-            int len = (int) wdn.size;
+            int len = (int) wdn.next_addr.Count;
             //截取字符串
             int num = (file_content.Length / (int)SuperBlock.BLOCK_SIZE) + 1;
+
             //Console.WriteLine("num:" + num.ToString());
             //Console.WriteLine("len:" + len.ToString());
+
             Console.WriteLine("addr"+wdn.next_addr[0]);
             //若写入字节大于原有磁盘块，分配新盘快
             if (num > len) { for (int i = 0; i < num - len;wdn.next_addr.Add(AllocADiskBlock()), i++) ; }
@@ -914,21 +949,39 @@ namespace FileSysConsole
                     wdn.next_addr.RemoveAt(addr_len - 1);
                 }
             }
+            //for (int i = 0; i < num; i++)
+            //{
+            //    //RecycleDiskBlock(wdn.next_addr[i]);
+            //    //wdn.next_addr[i] = AllocADiskBlock();
+            //    EraseBlock(wdn.next_addr[i]);
+            //}
             //逐块写入
+            //for (int i = 0; i < num; i++)
+            //    EraseBlock(wdn.next_addr[i]);
+            string str = "";
+            for (int i = 0; i < 1024; str += '\0', i++);
             FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             for (int i = 0; i < num; i++)
             {
+                //Console.WriteLine("wdn.next_addr[i]:" + wdn.next_addr[i]);
                 int leng = (file_content.Length - i * 1024 > 1024) ? 1024 : file_content.Length - i * 1024;
                 string file_block_temp = file_content.Substring(i * 1024, leng);
                 byte[] byte_block = System.Text.Encoding.Default.GetBytes(file_block_temp);
+                byte[] byk = System.Text.Encoding.Default.GetBytes(str);
+                //Console.WriteLine(System.Text.Encoding.Default.GetString(byte_block));
+                fs.Position = wdn.next_addr[i];
+                fs.Write(byk, 0, byk.Length);
                 fs.Position = wdn.next_addr[i];
                 fs.Write(byte_block, 0, byte_block.Length);
             }
             fs.Close();
+            wdn.size =(uint) ((num > len) ? num : len);
+            sys_current_user.open_file.Remove(wdn.id);
             //更新i节点，超级块，文件目录
             UpdateDiskSFi();
             return true;
         }
+
         /// <summary>
         /// 通过路径重命名文件(夹)
         /// </summary>
@@ -1010,6 +1063,8 @@ namespace FileSysConsole
             Create(ItemType.FILE, "usr1002/1.cpp");
             Create(ItemType.FILE, "usr2001/2.cpp");
             Create(ItemType.FILE, "usr2001/main.cpp");
+            FileStream fs = new FileStream("install.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            fs.Close();
         }
         /// <summary>
         /// 复制一个文件到另一个目录下（不支持复制文件夹！）
@@ -1089,6 +1144,7 @@ namespace FileSysConsole
                     fromlist.Remove(file); //将没有移动权限的文件从移动文件列表中移除
                     Console.WriteLine("You have no permissions to move " + file.name);
                 }
+                if (file.id == 1) fromlist.Remove(file);
             }
             if (fromlist.Count() == 0) return false; //没有可移动的文件
             DiskiNode to = GetiNodeByPath(tarpath).First();
@@ -1248,11 +1304,20 @@ namespace FileSysConsole
         public void ClearRecycleBin()
         {
             DiskiNode recyclebin = GetiNode(1);
+            List<uint> tmp = new List<uint>();
             foreach (uint item in recyclebin.next_addr)
             {
+                tmp.Add(item);
+            }
+            foreach (uint item in tmp)
+            {
+                string path = "/recyclebin/";
                 DiskiNode inode = GetiNode(item);
                 if (new uint[] { 2, 3, 6, 7 }.Contains(inode.uid[sys_current_user.uid]))
-                    DeleteAFolder(inode);
+                {
+                    path += inode.name;
+                    DeleteFolder(path);
+                }
             }
         }
 
@@ -1260,10 +1325,10 @@ namespace FileSysConsole
         /// 为搜索建立索引
         /// </summary>
         /// <param name="index"></param>
-        public bool CreateIndexForSearch()
+        public bool CreateIndexForSearch(string indexKey)
         {
-            Console.Write("Please enter an index-key to create an index: ");
-            string indexKey = Console.ReadLine();
+            //Console.Write("Please enter an index-key to create an index: ");
+            //string indexKey = Console.ReadLine();
             try
             {
                 DatabaseOp dbHandler = new DatabaseOp();
@@ -1290,6 +1355,38 @@ namespace FileSysConsole
                 Console.WriteLine(ex.Message);
                 return false;
             }
+        }
+
+        public void ExeSql()
+        {
+            DatabaseOp dbop = new DatabaseOp();
+            List<DiskiNode> biglist = new List<DiskiNode>();
+            foreach (iNodeTable item in sys_inode_tt.tt)
+            {
+                if (item != null)
+                {
+                    foreach (DiskiNode dn in item.di_table)
+                    {
+                        biglist.Add(dn);
+                    }
+                }
+            }
+            try
+            {
+                dbop.LoadDataToDb(biglist);
+                while (true)
+                {
+                    Console.Write(">sql: ");
+                    string sql = Console.ReadLine();
+                    if (sql == "exit") return;
+                    dbop.ExecuteUserCmd(sql);
+                }
+            }
+            catch
+            {
+                return;
+            }
+           
         }
 
         /// <summary>
@@ -1364,6 +1461,55 @@ namespace FileSysConsole
         }
 
         /// <summary>
+        /// 在当前目录下搜索（支持模糊查找）
+        /// </summary>
+        /// <param name="path">指定从那个目录开始搜索</param>
+        /// <param name="filename">要搜索的文件名</param>
+        /// <returns>返回当前目录下所有符合的文件i结点</returns>
+        public List<DiskiNode> SearchFromSpecificFolder(string path, string filename)
+        {
+            List<DiskiNode> reslist = new List<DiskiNode>();
+            Stack<DiskiNode> stack = new Stack<DiskiNode>();
+            uint curfolder = sys_current_user.current_folder;
+            if (path != "")
+            {
+                //从path指定的目录开始搜索
+                string[] filepath = path.Split("/");
+                foreach (string folder in filepath)
+                {
+                    //返回当前目录下名字为folder的文件(夹)
+                    foreach (uint itemid in GetiNode(curfolder).next_addr)
+                    {
+                        if (GetiNode(itemid).name == folder)
+                        {
+                            curfolder = itemid; //改变当前目录（但不改变用户项中当前目录）
+                            break;
+                        }
+                    }
+                }
+                //curfolder即为搜索的根目录
+            }
+
+            //从当前目录下开始搜索
+            stack.Push(GetiNode(curfolder));
+            while (stack.Count != 0)
+            {
+                DiskiNode visit = stack.Peek();
+                stack.Pop();
+                if (MatchString(visit.name, filename))
+                {
+                    reslist.Add(visit);
+                    Console.WriteLine(visit.name);
+                }
+                for (int i = visit.next_addr.Count - 1; i >= 0; i--)
+                {
+                    stack.Push(GetiNode(visit.next_addr[i]));
+                }
+            }
+            return reslist;
+        }
+
+        /// <summary>
         /// 计算文件（夹）大小
         /// </summary>
         /// <param name="inode">文件(夹)的i结点</param>
@@ -1418,7 +1564,7 @@ namespace FileSysConsole
             DiskiNode ndn = GetiNodeByPath(path)[0];
             Console.WriteLine("|Type\t\t|Size\t\t|Owner\t\t|ID\t\t|Name\t\t");
             Console.WriteLine("|---------------|---------------|---------------|---------------|---------------");
-            Console.WriteLine("|" + ndn.type + "\t\t|" + ndn.size + " KB\t\t|" + ndn.uid + "\t\t|" + ndn.id + "\t\t|" + ndn.name + "\t\t");
+            Console.WriteLine("|" + ndn.type + "\t\t|" + ndn.size + " KB\t\t|" + ndn.uid.FirstOrDefault().Key + "\t\t|" + ndn.id + "\t\t|" + ndn.name + "\t\t");
             if (addr)
                 for (int i = 0; i < ndn.next_addr.Count; i++)
                     Console.WriteLine(ndn.next_addr[i] + "|");
@@ -1429,14 +1575,16 @@ namespace FileSysConsole
         public void ShowDirectory(string path = ".", string order = "type", bool lite = true)
         {
             iNodeTable it = new iNodeTable();
-            DiskiNode diriNode;
+            List<DiskiNode> diriNode = new List<DiskiNode>();
             if (path == ".")
-            { diriNode = GetiNode(sys_current_user.current_folder); }
-            else { diriNode = GetiNodeByPath(path)[0]; }
-            foreach (uint itemid in diriNode.next_addr)
+            { diriNode.Add(GetiNode(sys_current_user.current_folder)); }
+            else { diriNode = GetiNodeByPath(path); }
+            foreach(DiskiNode dn in diriNode)
             {
-                DiskiNode dn = GetiNode(itemid);
-                it.di_table.Add(dn);
+                foreach (uint itemid in dn.next_addr)
+                {
+                    it.di_table.Add(GetiNode(itemid));
+                }
             }
             if (lite) ShowiNodeListLite(it, order);
             else ShowiNodeList(it, order);
@@ -1478,20 +1626,20 @@ namespace FileSysConsole
         public void ShowiNodeList(iNodeTable it, string order)
         {
             DiskiNode diriNode = GetiNode(sys_current_user.current_folder);
-            /*
+            
             if(!new uint[] { 4,5,6,7 }.Contains(diriNode.uid[sys_current_user.uid]))
             {
                 Console.WriteLine("You do not have sufficient permissions to view this folder!");
                 return;
             }
-            */
+            
             if (diriNode.next_addr.Count() == 0)
             {
                 Console.WriteLine("There is no file/folder.");
             }
             else
             {
-                for (int i = 0; it.di_table[i].type == ItemType.FOLDER && i < it.di_table.Count; i++)
+                for (int i = 0; i < it.di_table.Count && it.di_table[i].type == ItemType.FOLDER; i++)
                 {
                     it.di_table[i].size = CalFileOrFolderSize(it.di_table[i]);
                 }
@@ -1614,13 +1762,14 @@ namespace FileSysConsole
             }
             bool isStart = Start();//启动文件系统
             if (!isStart) return;
-            InitializationForTest();//批处理，创建一些文件和文件夹!!!首次运行时需要，之后注释掉!!!
+            if(!File.Exists("install.lock"))
+                InitializationForTest();//批处理，创建一些文件和文件夹!!!首次运行时需要，之后注释掉!!!
 
             //CopyFolder("usr2001", "usr1001");
             //ChangeCurrentDirectory("usr1001");
             //ShowDirectory();
-            CreateIndexForSearch();
-            SearchInAllDisk("usr2001");
+            //CreateIndexForSearch();
+            //SearchInAllDisk("usr2001");
 
             //Console.WriteLine(new uint[] { 2, 3, 6, 7 }.Contains<uint>(3));
             //Console.WriteLine("-----------------");

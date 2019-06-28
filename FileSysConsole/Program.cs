@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FileSysTemp.FSBase;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -77,19 +78,19 @@ namespace FileSysConsole
             @"^sql$",//31输入SQL
             @"^mv [^- ]+ [^- ]+$",//32移动文件或文件夹
             @"^mv -d [^- ]+ [^- ]+$",//33移动时显示都移动了哪些文件/文件夹
-            @"^rm [^- ]+ [^- ]+$",//34删除文件或文件夹
+            @"^rm [^- ]+$",//34删除文件或文件夹
             @"^rm -d [^- ]+ [^- ]+$",//35删除时显示都删除了哪些文件/文件夹
-            @"^rm -f [^- ]+ [^- ]+$",//36删除文件或文件夹，并不放回收站
-            @"^rm -f -d [^- ]+ [^- ]+$",//37删除时显示都删除了哪些文件/文件夹，并不放回收站
-            @"^scp [^- ]+ [^- ]+$",//38复制文件或文件夹
-            @"^scp -d [^- ]+ [^- ]+$",//39复制时显示都复制了哪些文件/文件夹
-            @"^rec [^- ]+$",//40回收某个文件
-            @"^rec [^- ]+ -p [^- ]+$",//41回收某个文件到指定路径
+            @"^rm -c [^- ]+$",//36删除文件或文件夹，并不放回收站
+            @"^rm -c -d [^- ]+$",//37删除时显示都删除了哪些文件/文件夹，并不放回收站
+            @"^cp [^- ]+ [^- ]+$",//38复制文件
+            @"^cp -d [^- ]+ [^- ]+$",//39复制时显示都复制了哪些文件/文件夹
+            @"^rec [^- ]+$",//40还原某个文件
+            @"^rec [^- ]+ -p [^- ]+$",//41还原某个文件到指定路径
             @"^rec -clr$",//42清空回收站
             @"^rec -show$",//43显示回收站
 
-            @"^chomd [^- ]+ name [^ ~]+",//44重命名
-            @"^chomd [^- ]+ uid [0-9]+",//45更改权限
+            @"^chomd [^- ]+ -name [^ ~]+$",//44重命名
+            @"^chomd -a [^- ]+ [\d]+ [0-7]$",//45更改权限
 
             @"^login$",//46登录
             @"^logout$",//47注销
@@ -97,6 +98,10 @@ namespace FileSysConsole
             @"^install$",//49安装文件系统
             @"^format$",//50格式化文件系统
             @"^cd [^ ]+$",//51进入目录
+            @"^rm -f [^- ]+$",//52删除文件夹
+            @"^rm -c -f [^- ]+$",//53彻底删除文件夹，并不放回收站
+            @"^cp -f [^- ]+ [^- ]+$",//54复制文件夹
+            @"^chomd -r [^- ]+ [\d]+ [0-7]$",//55更改权限
         };
     }
     /// <summary>
@@ -114,7 +119,8 @@ namespace FileSysConsole
             while (true)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(exe.sys_current_user.uid + "@" + exe.GetiNode(exe.sys_current_user.current_folder).name + ">");
+                if(exe.sys_current_user!=null)
+                    Console.Write(exe.sys_current_user.uid + "@" + exe.GetiNode(exe.sys_current_user.current_folder).name + ">");
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 string command = Console.ReadLine();
                 Console.ForegroundColor = ConsoleColor.White;
@@ -191,7 +197,7 @@ namespace FileSysConsole
                         }
                     case 13:
                         {
-                            exe.ShowDetail(com_part[1], true);
+                            exe.ShowDetail(com_part[2], true);
                             break;
                         }
                     case 14:
@@ -211,24 +217,28 @@ namespace FileSysConsole
                         }
                     case 17:
                         {
-                            Console.WriteLine("Please input:");
-                            string content = Console.ReadLine();
-                            exe.WriteFile(com_part[1], content);
+                            exe.WriteFile(com_part[1]);
                             break;
                         }
                     case 18:
                         {
-
+                            iNodeTable itab = new iNodeTable();
+                            itab.di_table = exe.SearchFromSpecificFolder("",com_part[1]);
+                            exe.ShowiNodeList(itab, "type");
                             break;
                         }
                     case 19:
                         {
-
+                            iNodeTable itab = new iNodeTable();
+                            itab.di_table = exe.SearchFromSpecificFolder(com_part[2], com_part[1]);
+                            exe.ShowiNodeList(itab, "type");
                             break;
                         }
                     case 20:
                         {
-
+                            iNodeTable itab = new iNodeTable();
+                            itab.di_table = exe.SearchInAllDisk(com_part[2]);
+                            exe.ShowiNodeList(itab, "type");
                             break;
                         }
                     case 21:
@@ -278,17 +288,17 @@ namespace FileSysConsole
                         }
                     case 30:
                         {
-
+                            exe.CreateIndexForSearch(com_part[1]);
                             break;
                         }
                     case 31:
                         {
-
+                            exe.ExeSql();
                             break;
                         }
                     case 32:
                         {
-
+                            exe.Move(com_part[1], com_part[2]);
                             break;
                         }
                     case 33:
@@ -298,7 +308,7 @@ namespace FileSysConsole
                         }
                     case 34:
                         {
-
+                            exe.MoveToRecycleBin(com_part[1]);
                             break;
                         }
                     case 35:
@@ -308,7 +318,7 @@ namespace FileSysConsole
                         }
                     case 36:
                         {
-
+                            exe.DeleteFile(com_part[2]);
                             break;
                         }
                     case 37:
@@ -318,7 +328,7 @@ namespace FileSysConsole
                         }
                     case 38:
                         {
-
+                            exe.CopyFile(com_part[1], com_part[2]);
                             break;
                         }
                     case 39:
@@ -328,7 +338,7 @@ namespace FileSysConsole
                         }
                     case 40:
                         {
-
+                            exe.RestoreFromRecycleBin(com_part[1]);
                             break;
                         }
                     case 41:
@@ -338,37 +348,37 @@ namespace FileSysConsole
                         }
                     case 42:
                         {
-
+                            exe.ClearRecycleBin();
                             break;
                         }
                     case 43:
                         {
-
+                            exe.ShowRecycleBin();
                             break;
                         }
                     case 44:
                         {
-
+                            exe.Rename(com_part[1], com_part[3], exe.GetiNodeByPath(com_part[1]).First().type);
                             break;
                         }
                     case 45:
                         {
-
+                            exe.AssignAuthority(com_part[2], Convert.ToUInt32(com_part[3]), Convert.ToUInt32(com_part[4]));
                             break;
                         }
                     case 46:
                         {
-
+                            exe.LoginSys();
                             break;
                         }
                     case 47:
                         {
-
+                            exe.LogoutSys();
                             break;
                         }
                     case 48:
                         {
-
+                            exe.RevisePassword();
                             break;
                         }
                     case 49:
@@ -388,7 +398,22 @@ namespace FileSysConsole
                         }
                     case 52:
                         {
-
+                            exe.MoveToRecycleBin(com_part[2]);
+                            break;
+                        }
+                    case 53:
+                        {
+                            exe.DeleteFolder(com_part[3]);
+                            break;
+                        }
+                    case 54:
+                        {
+                            exe.CopyFolder(com_part[2], com_part[3]);
+                            break;
+                        }
+                    case 55:
+                        {
+                            exe.RecycleAuthority(com_part[2], Convert.ToUInt32(com_part[3]), Convert.ToUInt32(com_part[4]));
                             break;
                         }
                     default: { Console.WriteLine("Error, Enter \"help\" or \"xxx -h\" to get help."); break; }

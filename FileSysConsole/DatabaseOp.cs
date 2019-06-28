@@ -100,6 +100,7 @@ namespace FileSysConsole
         {
             try
             {
+                ClearTableInDb();
                 //采用事务操作可以实现批量数据的快速导入
                 using (SQLiteTransaction dbTrans = m_dbConnection.BeginTransaction())
                 {
