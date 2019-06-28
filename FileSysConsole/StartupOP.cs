@@ -1022,13 +1022,13 @@ namespace FileSysConsole
         /// <returns></returns>
         public bool CopyiNodeDisk(DiskiNode from, DiskiNode to)
         {
-            if (from.next_addr.Count() != to.next_addr.Count()) { Console.WriteLine("From's block != To's block"); return false; }
+            if (from.next_addr.Count() != to.next_addr.Count()) { return false; }//Console.WriteLine("From's block != To's block"); return false; }
             else
             {
                 int block_num = from.next_addr.Count();
                 FileStream fs = new FileStream("filesystem", FileMode.OpenOrCreate, FileAccess.ReadWrite);
                 //一块一块地读，因为可能不连续
-                for(int i=0;i<block_num;i++)
+                for (int i = 0; i < block_num; i++)
                 {
                     uint b_from = from.next_addr[i] * SuperBlock.BLOCK_SIZE;
                     uint b_to = to.next_addr[i] * SuperBlock.BLOCK_SIZE;
@@ -1112,7 +1112,7 @@ namespace FileSysConsole
                 {
                     fore_addr = to.id
                 };
-                for (int i = 0; i < inode.size; i++)
+                for (int i = 0; i < inode.next_addr.Count; i++)
                 {
                     newiNode.next_addr.Add(AllocADiskBlock());
                 }
