@@ -47,7 +47,7 @@ namespace FileSysTemp.FSBase
         public uint id;                                //磁盘i节点ID
         public string name;                            //文件(夹)名
         public uint size;                              //文件(夹)大小
-        public Dictionary<uint, uint> uid;               //用户ID，1~1000用户组1，2~2000用户组2...(uid,priority)
+        public Dictionary<uint, uint> uid;             //用户ID，1~1000用户组1，2~2000用户组2...(uid,priority)
         public List<uint> next_addr = new List<uint>();//文件的磁盘块地址或者文件夹下的文件(夹)的i节点ID
         public uint fore_addr;                         //上层目录的i的ID
         public DateTime t_create;                      //文件(夹)创建时间
